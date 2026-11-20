@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from typing import Generic, TypeVar
+from typing import Generic, Self, TypeVar
 
 from sqlalchemy import Column, Integer, MetaData, String, Table, create_engine, select
 from sqlalchemy.engine import Engine
@@ -53,7 +53,7 @@ class UnitOfWork:
         self._session_factory = session_factory
         self.session: Session | None = None
 
-    def __enter__(self) -> UnitOfWork:
+    def __enter__(self) -> Self:
         self.session = self._session_factory()
         return self
 

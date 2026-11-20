@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from collections import deque
 import logging
+from collections import deque
 
 from vorpal.core.context import AppContext
 from vorpal.core.errors import ConflictError, NotFoundError, ValidationError
@@ -86,9 +86,9 @@ class ModuleRegistry:
                 mod.start(ctx)
                 self._states[name] = ModuleState.RUNNING
                 self._start_order.append(name)
-            except Exception as exc:
+            except Exception:
                 self._states[name] = ModuleState.FAILED
-                self._logger.exception("Échec du démarrage du module '%s': %s", name, exc)
+                self._logger.exception("Échec du démarrage du module '%s'", name)
 
     def stop_all(self) -> None:
         for name in reversed(self._start_order):
@@ -96,6 +96,6 @@ class ModuleRegistry:
             try:
                 mod.stop()
                 self._states[name] = ModuleState.STOPPED
-            except Exception as exc:
+            except Exception:
                 self._states[name] = ModuleState.FAILED
-                self._logger.exception("Erreur lors de l'arrêt du module '%s': %s", name, exc)
+                self._logger.exception("Erreur lors de l'arrêt du module '%s'", name)

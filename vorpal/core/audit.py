@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime, timezone
 import hashlib
 import json
-
+from dataclasses import dataclass
+from datetime import UTC, datetime
 
 GENESIS_HASH = "0" * 64
 
@@ -73,7 +72,7 @@ class AuditLog:
         timestamp: datetime | None = None,
     ) -> AuditEntry:
         seq = len(self._entries) + 1
-        ts = timestamp or datetime.now(timezone.utc)
+        ts = timestamp or datetime.now(UTC)
         prev_hash = self._entries[-1].entry_hash if self._entries else GENESIS_HASH
         entry_hash = compute_entry_hash(
             seq=seq,

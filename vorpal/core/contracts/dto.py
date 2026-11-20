@@ -2,11 +2,22 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, BeforeValidator, Field, model_validator
 
 from vorpal.core.money import Currency
+
+
+def _reject_float_and_bool(value: object) -> object:
+    if isinstance(value, (float, bool)):
+        raise ValueError("float et bool interdits pour les montants; utiliser Decimal, int ou str.")  # noqa: TRY004  (pydantic exige ValueError)
+    return value
+
+
+StrictDecimal = Annotated[Decimal, BeforeValidator(_reject_float_and_bool)]
+
+_CENT = Decimal("0.01")
 
 
 class PartyInfoDTO(BaseModel):
@@ -18,10 +29,10 @@ class PartyInfoDTO(BaseModel):
 
 class InvoiceLineDTO(BaseModel):
     designation: str = Field(min_length=1)
-    quantity: Decimal = Field(gt=Decimal("0"))
-    unit_price_ht: Decimal = Field(ge=Decimal("0"))
+    quantity: StrictDecimal = Field(gt=Decimal(0))
+    unit_price_ht: StrictDecimal = Field(ge=Decimal(0))
     tax_group: str = Field(default="A", min_length=1)
-    vat_rate: Decimal = Field(ge=Decimal("0"))
+    vat_rate: StrictDecimal = Field(ge=Decimal(0))
 
 
 class InvoiceDTO(BaseModel):
@@ -31,11 +42,20 @@ class InvoiceDTO(BaseModel):
     customer: PartyInfoDTO
     lines: list[InvoiceLineDTO] = Field(min_length=1)
     currency: Currency
-    total_ht: Decimal = Field(ge=Decimal("0"))
-    total_vat: Decimal = Field(ge=Decimal("0"))
-    total_ttc: Decimal = Field(ge=Decimal("0"))
+    total_ht: StrictDecimal = Field(ge=Decimal(0))
+    total_vat: StrictDecimal = Field(ge=Decimal(0))
+    total_ttc: StrictDecimal = Field(ge=Decimal(0))
     invoice_type: Literal["vente", "avoir"] = "vente"
     original_invoice_ref: str | None = None
+
+    @model_validator(mode="after")
+    def validate_totals(self) -> InvoiceDTO:
+        if self.total_ht + self.total_vat != self.total_ttc:
+            raise ValueError("Totaux incohérents: total_ttc doit être égal à total_ht + total_vat.")
+        lines_ht = sum((ln.quantity * ln.unit_price_ht for ln in self.lines), Decimal(0))
+        if abs(lines_ht - self.total_ht) > _CENT * len(self.lines):
+            raise ValueError("Totaux incohérents: total_ht diffère de la somme des lignes.")
+        return self
 
     @model_validator(mode="after")
     def validate_credit_note_ref(self) -> InvoiceDTO:
@@ -54,15 +74,15 @@ class CertifiedInvoiceDTO(InvoiceDTO):
 
 class JournalLineDTO(BaseModel):
     account: str = Field(min_length=1)
-    debit: Decimal = Field(default=Decimal("0"), ge=Decimal("0"))
-    credit: Decimal = Field(default=Decimal("0"), ge=Decimal("0"))
+    debit: StrictDecimal = Field(default=Decimal(0), ge=Decimal(0))
+    credit: StrictDecimal = Field(default=Decimal(0), ge=Decimal(0))
     currency: Currency
 
     @model_validator(mode="after")
     def validate_line_side(self) -> JournalLineDTO:
-        if self.debit > Decimal("0") and self.credit > Decimal("0"):
+        if self.debit > Decimal(0) and self.credit > Decimal(0):
             raise ValueError("Une ligne d'écriture ne peut avoir à la fois un débit et un crédit > 0.")
-        if self.debit == Decimal("0") and self.credit == Decimal("0"):
+        if self.debit == Decimal(0) and self.credit == Decimal(0):
             raise ValueError("Une ligne d'écriture doit avoir un débit ou un crédit > 0.")
         return self
 
@@ -76,18 +96,20 @@ class JournalEntryDTO(BaseModel):
 
     @model_validator(mode="after")
     def validate_balanced(self) -> JournalEntryDTO:
-        total_debit = sum((line.debit for line in self.lines), Decimal("0"))
-        total_credit = sum((line.credit for line in self.lines), Decimal("0"))
-        if total_debit != total_credit:
-            raise ValueError(f"Écriture déséquilibrée: débit={total_debit} != crédit={total_credit}.")
+        balance: dict[Currency, Decimal] = {}
+        for line in self.lines:
+            balance[line.currency] = balance.get(line.currency, Decimal(0)) + line.debit - line.credit
+        unbalanced = {cur.value: str(bal) for cur, bal in balance.items() if bal != 0}
+        if unbalanced:
+            raise ValueError(f"Écriture déséquilibrée par devise (débit - crédit): {unbalanced}.")
         return self
 
 
 class PayrollResultDTO(BaseModel):
     period: str = Field(min_length=1)
     employee_id: str = Field(min_length=1)
-    gross_pay: Decimal = Field(ge=Decimal("0"))
-    deductions: Decimal = Field(ge=Decimal("0"))
-    net_pay: Decimal = Field(ge=Decimal("0"))
-    employer_charges: Decimal = Field(ge=Decimal("0"))
-    breakdown: dict[str, Decimal] = Field(default_factory=dict)
+    gross_pay: StrictDecimal = Field(ge=Decimal(0))
+    deductions: StrictDecimal = Field(ge=Decimal(0))
+    net_pay: StrictDecimal = Field(ge=Decimal(0))
+    employer_charges: StrictDecimal = Field(ge=Decimal(0))
+    breakdown: dict[str, StrictDecimal] = Field(default_factory=dict)

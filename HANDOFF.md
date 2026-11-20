@@ -13,3 +13,11 @@
   - # TODO(A_VALIDER): Règles d'arrondi spécifiques par devise/opération (actuellement `ROUND_HALF_UP` à 2 décimales pour `USD` et `CDF`).
 - Commande de test : `pytest tests/core -q` -> 7 passed.
 - Prochain fichier à écrire : `vorpal/modules/dgi/` (modèles et interfaces selon spec 02).
+
+## [2026-11-20] Module: core (01) : couverture config/money + lint (patch Claude)
+- Fait : tests config (test_config.py) et money (test_money_extra.py) ; config.py : secrets masqués (repr=False), JSON malformé / fichier illisible -> ValidationError, message d'erreur sans valeurs saisies ; corrections lint manuelles ; engine.dispose() dans le test DB.
+- Résultats RÉELS à coller ici après exécution (Claude n'a pas pu lancer les outils) :
+  - pytest --cov=vorpal --cov-report=term-missing -q -> ...
+  - ruff check . -> ...
+  - mypy --strict vorpal -> ...
+- Limite connue : _parse_simple_yaml ne gère ni listes ni sections imbriquées ni '#' dans une valeur (ex. URL avec #). Si besoin : passer à PyYAML.

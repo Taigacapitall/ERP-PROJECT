@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime, timezone
 import logging
-from typing import Callable
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
 
 from sqlalchemy.engine import Engine
 
@@ -17,7 +17,7 @@ Clock = Callable[[], datetime]
 
 
 def utc_clock() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 @dataclass(frozen=True)
@@ -29,4 +29,4 @@ class AppContext:
     audit: AuditLog
     authz: AuthorizationService
     clock: Clock = utc_clock
-    logger: logging.Logger = logging.getLogger("vorpal")
+    logger: logging.Logger = field(default_factory=lambda: logging.getLogger("vorpal"))

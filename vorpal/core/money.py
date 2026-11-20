@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import date
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from enum import Enum
 
 from vorpal.core.errors import NotFoundError, ValidationError
@@ -20,19 +20,25 @@ CURRENCY_DECIMALS: dict[Currency, int] = {
 }
 
 
-def _to_decimal(value: Decimal | int | str | float) -> Decimal:
+def _to_decimal(value: Decimal | str | float) -> Decimal:
+    if isinstance(value, bool):
+        raise ValidationError("Les booléens ne sont pas des montants valides.")
     if isinstance(value, float):
         raise ValidationError("Les montants en float sont interdits; utiliser Decimal.")
     if isinstance(value, Decimal):
-        return value
-    if isinstance(value, int):
-        return Decimal(value)
-    if isinstance(value, str):
+        dec = value
+    elif isinstance(value, int):
+        dec = Decimal(value)
+    elif isinstance(value, str):
         try:
-            return Decimal(value.strip())
+            dec = Decimal(value.strip())
         except InvalidOperation as exc:
             raise ValidationError(f"Montant décimal invalide: {value!r}") from exc
-    raise ValidationError(f"Type de montant non supporté: {type(value).__name__}")
+    else:
+        raise ValidationError(f"Type de montant non supporté: {type(value).__name__}")
+    if not dec.is_finite():
+        raise ValidationError("Montant invalide: NaN et Infinity sont interdits.")
+    return dec
 
 
 @dataclass(frozen=True)
@@ -145,13 +151,13 @@ class InMemoryRateProvider(ExchangeRateProvider):
 
     def get_rate(self, from_currency: Currency, to_currency: Currency, on_date: date) -> Decimal:
         if from_currency == to_currency:
-            return Decimal("1")
+            return Decimal(1)
         key = (from_currency, to_currency, on_date)
         if key in self._rates:
             return self._rates[key]
         reverse_key = (to_currency, from_currency, on_date)
         if reverse_key in self._rates:
-            return Decimal("1") / self._rates[reverse_key]
+            return Decimal(1) / self._rates[reverse_key]
         raise NotFoundError(
             f"Taux introuvable pour {from_currency.value}->{to_currency.value} à la date {on_date.isoformat()}."
         )

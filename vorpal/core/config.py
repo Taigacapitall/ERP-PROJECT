@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, Field
+from pydantic import ValidationError as PydanticValidationError
 
 from vorpal.core.errors import ValidationError
 
@@ -15,7 +16,8 @@ class AppConfig(BaseModel):
     db_url: str = "sqlite:///vorpal.db"
     log_level: str = "INFO"
     default_currency: Literal["USD", "CDF"] = "USD"
-    secrets: dict[str, str] = Field(default_factory=dict)
+    # repr=False : les secrets n'apparaissent jamais dans repr()/str()/logs.
+    secrets: dict[str, str] = Field(default_factory=dict, repr=False)
 
     @classmethod
     def load(
@@ -28,9 +30,17 @@ class AppConfig(BaseModel):
             path = Path(config_path)
             if not path.exists():
                 raise ValidationError(f"Fichier de configuration introuvable: {path}")
-            raw_text = path.read_text(encoding="utf-8")
+            try:
+                raw_text = path.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError) as exc:
+                raise ValidationError(f"Fichier de configuration illisible: {path}") from exc
             if path.suffix.lower() == ".json":
-                parsed = json.loads(raw_text)
+                try:
+                    parsed = json.loads(raw_text)
+                except json.JSONDecodeError as exc:
+                    raise ValidationError(
+                        f"Fichier JSON malformé: {path} (ligne {exc.lineno}, colonne {exc.colno})"
+                    ) from exc
             elif path.suffix.lower() in {".yaml", ".yml"}:
                 parsed = _parse_simple_yaml(raw_text)
             else:
@@ -59,8 +69,12 @@ class AppConfig(BaseModel):
 
         try:
             return cls.model_validate(data)
-        except Exception as exc:
-            raise ValidationError(f"Configuration invalide: {exc}") from exc
+        except PydanticValidationError as exc:
+            # Uniquement champ + message : jamais les valeurs saisies (elles peuvent être des secrets).
+            details = "; ".join(
+                f"{'.'.join(str(part) for part in err['loc'])}: {err['msg']}" for err in exc.errors()
+            )
+            raise ValidationError(f"Configuration invalide: {details}") from None
 
 
 def _parse_simple_yaml(text: str) -> dict[str, object]:

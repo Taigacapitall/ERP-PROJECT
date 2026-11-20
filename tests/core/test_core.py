@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Protocol, runtime_checkable
@@ -39,7 +39,13 @@ from vorpal.core import (
     convert,
     create_db_engine,
 )
-from vorpal.core.contracts.dto import InvoiceDTO, InvoiceLineDTO, JournalEntryDTO, JournalLineDTO, PartyInfoDTO
+from vorpal.core.contracts.dto import (
+    InvoiceDTO,
+    InvoiceLineDTO,
+    JournalEntryDTO,
+    JournalLineDTO,
+    PartyInfoDTO,
+)
 from vorpal.core.contracts.events import EVENT_HANDLER_FAILED, INVOICE_CERTIFIED
 
 
@@ -67,7 +73,7 @@ def test_money_float_rejected_and_currency_mismatch() -> None:
 
     assert (m1 + m2).amount == Decimal("15.00")
     assert (m1 - m2).amount == Decimal("5.00")
-    assert (m1 * Decimal("2")).amount == Decimal("20.00")
+    assert (m1 * Decimal(2)).amount == Decimal("20.00")
     assert m1 < (m1 + m2)
     assert m1 <= (m1 + m2)
     assert (m1 + m2) > m1
@@ -174,7 +180,7 @@ def test_event_bus_isolation_idempotence_wildcard_and_replay() -> None:
     bus.publish(ev)
 
     assert received == ["evt-1"]
-    assert failed_seen == ["evt-1"]
+    assert failed_seen == ["evt-1", "evt-1"]  # un échec par tentative (handler en échec = réessayé)
     assert "demo.ping" in wildcard_seen
     assert EVENT_HANDLER_FAILED in wildcard_seen
 
@@ -249,7 +255,7 @@ def test_two_modules_communicate_via_event_and_service_without_importing(app_ctx
 
 def test_audit_chain_tamper_detection() -> None:
     audit = AuditLog()
-    ts = datetime(2026, 11, 20, 1, 0, tzinfo=timezone.utc)
+    ts = datetime(2026, 11, 20, 1, 0, tzinfo=UTC)
     audit.record("admin", "CREATE", "invoice", "INV-1", after={"ttc": "116.00"}, timestamp=ts)
     audit.record("admin", "CERTIFY", "invoice", "INV-1", before={"status": "DRAFT"}, after={"status": "CERTIFIED"}, timestamp=ts)
     assert audit.verify_chain() is True
@@ -316,7 +322,7 @@ def test_db_uow_migrations_authz_partners_config_and_dto(tmp_path: Path) -> None
         invoice_date=date(2026, 11, 20),
         seller=PartyInfoDTO(name="Vendeur", nif="NIF-V"),
         customer=PartyInfoDTO(name="Client", nif="NIF-C"),
-        lines=[InvoiceLineDTO(designation="Service", quantity=Decimal("1"), unit_price_ht=Decimal("100.00"), vat_rate=Decimal("0.16"))],
+        lines=[InvoiceLineDTO(designation="Service", quantity=Decimal(1), unit_price_ht=Decimal("100.00"), vat_rate=Decimal("0.16"))],
         currency=Currency.USD,
         total_ht=Decimal("100.00"),
         total_vat=Decimal("16.00"),
@@ -337,3 +343,4 @@ def test_db_uow_migrations_authz_partners_config_and_dto(tmp_path: Path) -> None
     )
     assert len(je.lines) == 3
     _ = INVOICE_CERTIFIED
+    engine.dispose()
