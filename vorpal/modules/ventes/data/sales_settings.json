@@ -1,0 +1,89 @@
+{
+  "status": "A_VALIDER",
+  "seller": {
+    "name": "ENTREPRISE DEMO SARL",
+    "nif": "A0000000X",
+    "rccm": "CD/LSH/RCCM/00-0-00000",
+    "address": "Avenue Mobutu, Lubumbashi, Haut-Katanga, RDC"
+  },
+  "default_currency": "USD",
+  "default_payment_terms_days": 30,
+  "tax_groups": [
+    {
+      "code": "A",
+      "label": "TVA Standard (Placeholder A_VALIDER)",
+      "vat_rate": "0.16",
+      "is_out_of_scope": false,
+      "status": "A_VALIDER"
+    },
+    {
+      "code": "E",
+      "label": "Exonere / Hors champ (Placeholder A_VALIDER)",
+      "vat_rate": "0.00",
+      "is_out_of_scope": true,
+      "status": "A_VALIDER"
+    }
+  ],
+  "rounding": {
+    "USD": 2,
+    "CDF": 2,
+    "mode": "ROUND_HALF_UP",
+    "strategy": "PER_LINE",
+    "status": "A_VALIDER"
+  },
+  "numbering": {
+    "quote": {
+      "prefix": "DEV",
+      "padding": 5,
+      "include_year": true,
+      "status": "A_VALIDER"
+    },
+    "order": {
+      "prefix": "CMD",
+      "padding": 5,
+      "include_year": true,
+      "status": "A_VALIDER"
+    },
+    "invoice": {
+      "prefix": "FAC",
+      "padding": 6,
+      "include_year": true,
+      "status": "A_VALIDER"
+    },
+    "credit_note": {
+      "prefix": "AVO",
+      "padding": 6,
+      "include_year": true,
+      "status": "A_VALIDER"
+    },
+    "payment": {
+      "prefix": "ENC",
+      "padding": 6,
+      "include_year": true,
+      "status": "A_VALIDER"
+    }
+  },
+  "reminder_levels": [
+    {
+      "code": "REL_1",
+      "days_after_due": 7,
+      "channel": "email",
+      "template": "Rappel amiable : votre facture {invoice_number} est echue depuis {days_overdue} jours.",
+      "status": "A_VALIDER"
+    },
+    {
+      "code": "REL_2",
+      "days_after_due": 15,
+      "channel": "sms",
+      "template": "Relance : merci de regulariser la facture {invoice_number} ({balance_due} {currency}).",
+      "status": "A_VALIDER"
+    },
+    {
+      "code": "REL_3",
+      "days_after_due": 30,
+      "channel": "whatsapp",
+      "template": "Mise en demeure avant contentieux pour la facture {invoice_number}.",
+      "status": "A_VALIDER"
+    }
+  ]
+}

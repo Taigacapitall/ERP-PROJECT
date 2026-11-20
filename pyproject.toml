@@ -44,3 +44,6 @@ ignore = [
 [tool.mypy]
 python_version = "3.11"
 strict = true
+
+[tool.setuptools.package-data]
+"vorpal.modules.ventes" = ["data/*.json"]

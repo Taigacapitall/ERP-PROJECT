@@ -1,71 +1,295 @@
-## [2026-11-20 02:02 CAT] Module: core (01)
-- Fait : Implémentation complète de `vorpal/core` (money, module, registry, context, events, services, db, audit, config, security, errors, partners, contracts/{dto,protocols,events}) + suite de tests `tests/core/test_core.py`, alignée sur l'architecture mise à jour (`vorpal/modules/adapters/odoo` + `odoo_addons/vorpal_compta_ohada` à l'étape 3).
-- Reste à faire (ordre de priorité) :
-  1. Passer au module `dgi` (spec 02) : modèles, interfaces, services, adaptateurs, événements, tests.
-  2. Passer à la comptabilité Odoo (`vorpal/modules/adapters/odoo` + `odoo_addons/vorpal_compta_ohada`, spec 03).
-  3. Passer au module `rh_paie` (spec 04).
-- Décisions prises :
-  - `Money` interdit strictement les `float` et toute opération arithmétique/comparaison entre devises distinctes.
-  - `EventBus` isole les exceptions de handlers, émet `event.handler_failed`, applique l'idempotence par `(handler, event.id)` et supporte le wildcard `*` ainsi que `EventStore` / `replay()`.
-  - `AuditLog` chaîne chaque entrée avec `prev_hash` et `entry_hash` en SHA-256 canonique et vérifie l'intégrité via `verify_chain()`.
-- Points A_VALIDER :
-  - # TODO(A_VALIDER): Format exact de persistence SQLAlchemy pour `AuditLog` et `EventStore` en production (actuellement en mémoire dans `core`, persistance DB à confirmer).
-  - # TODO(A_VALIDER): Règles d'arrondi spécifiques par devise/opération (actuellement `ROUND_HALF_UP` à 2 décimales pour `USD` et `CDF`).
-- Commande de test : `pytest tests/core -q` -> 7 passed.
-- Prochain fichier à écrire : `vorpal/modules/dgi/` (modèles et interfaces selon spec 02).
+# HANDOFF --- Vorpal Business Manager
 
-## [2026-11-20] Module: core (01) : couverture config/money + lint (patch Claude)
-- Fait : tests config (test_config.py) et money (test_money_extra.py) ; config.py : secrets masqués (repr=False), JSON malformé / fichier illisible -> ValidationError, message d'erreur sans valeurs saisies ; corrections lint manuelles ; engine.dispose() dans le test DB.
-- Résultats (état avant le lot A du 2026-11-20 ci-dessous) : 60 passed, couverture 96 %, ruff 2 × B015, mypy 1 erreur (config.py:63).
-- Limite connue : _parse_simple_yaml ne gère ni listes ni sections imbriquées ni '#' dans une valeur (ex. URL avec #). Si besoin : passer à PyYAML.
+**Dernière mise à jour documentaire : 20 novembre 2026**\
+**Contexte :** préparation de la publication du dépôt GitHub et
+transmission aux prochains agents.
 
-## [2026-11-20] Module: core (01) : lot A (corrections de stabilisation)
-- Fait :
-  - `tests/core/test_money_extra.py` : B015 corrigés (`operator.lt` / `operator.ge`).
-  - `vorpal/core/config.py` : erreur mypy ligne 63 corrigée (narrowing `isinstance` sur `secrets`), comportement inchangé.
-  - `tests/core/test_core.py` : fixture `app_ctx` en `yield` + `engine.dispose()` (cause suspectée du ResourceWarning SQLite, non reproduit en Python 3.12.3 : à reconfirmer sur la machine d'origine).
-  - Nouveau test d'ordre : `resolve_order()` == ["a", "b", "c"] et arrêt dans l'ordre inverse.
-- Reste à faire (ordre de priorité) :
-  1. (fait) Lot B applique : voir l'entree suivante. Puis module `dgi` (spec 02).
-  2. Module compta Odoo (spec 03), puis `rh_paie` (spec 04).
-- Décisions prises :
-  - `AppContext` contient `authz` (absent de la liste de la spec 01, requis par `AuthorizationService` et le registry).
-- Points à trancher (lot B : tranches et appliques, voir l'entree suivante) :
-  - Contrats DTO vs spec 02 : `InvoiceLineDTO` n'a pas de code article (exigé pour les lignes « hors champ »), `InvoiceDTO` n'a ni « montant non taxable » ni « autres impôts et taxes » (mentions obligatoires). Enrichir maintenant (champs optionnels) ou au début du module dgi ?
-  - `PyYAML` est déclaré dans `pyproject.toml` mais non utilisé (parseur maison) et hors stack autorisée par la spec 00 : le retirer ou le documenter.
-  - Chemin de l'adaptateur Odoo : `vorpal/modules/adapters/odoo` (spec 00, ce fichier) vs `vorpal/adapters/odoo` (spec 03).
-  - `AuditLog.record` ne copie pas `before` / `after` : une mutation par l'appelant casse `verify_chain()`.
-  - `event.handler_failed` absent du catalogue de la spec 01 et de `OFFICIAL_EVENTS`.
-  - `InvoiceDTO` : `total_vat` non recoupé avec `vat_rate` des lignes (à confirmer avec la spec DGI).
-  - Tests dupliqués entre `test_hardening.py` et `test_core_hardening.py` ; aucune section `[tool.ruff.lint]` configurée.
-  - `JournalLineDTO` sans montant en devise société ni taux (à revoir à l'étape 3, critère « facture CDF dans société USD »).
-- Points A_VALIDER (inchangés) : persistance DB de `AuditLog` / `EventStore` (en mémoire) ; règles d'arrondi par devise (`ROUND_HALF_UP`, 2 décimales USD et CDF).
-- Commande de test : `pytest --cov=vorpal -q` -> 61 passed, couverture 96 % ; `ruff check .` -> All checks passed ; `mypy --strict vorpal` -> Success: no issues found in 18 source files.
-- Prochain fichier à écrire : voir l'entree lot B ci-dessous.
+> Ce document est le point d'entrée de reprise. Il résume l'état connu
+> du projet et renvoie vers les documentations techniques. Les résultats
+> de qualité datés sont des instantanés historiques : les commandes
+> doivent être relancées avant toute affirmation sur l'état actuel.
 
-## [2026-11-20] Module: core (01) : lot B (decisions B1 a B8 appliquees)
-- Fait :
-  - B1 `contracts/dto.py` : `InvoiceLineDTO.item_code` (optionnel, non vide), `InvoiceDTO.non_taxable_amount` et `InvoiceDTO.other_taxes` (Decimal >= 0, defaut 0, float et bool refuses). Simples porteurs pour le module dgi : aucune regle de totaux modifiee. Herites par `CertifiedInvoiceDTO`.
-  - B2 `pyproject.toml` : `PyYAML` retire (non utilise, hors stack de la spec 00). `_parse_simple_yaml` reste le parseur YAML du core.
-  - B4 `core/audit.py` : `AuditLog.record` copie `before` et `after` (deepcopy). Une mutation ulterieure par l'appelant ne casse plus `verify_chain()`.
-  - B5 `contracts/events.py` : `event.handler_failed` documente comme evenement systeme, volontairement hors `OFFICIAL_EVENTS` (evenements metier).
-  - B7 `pyproject.toml` : section `[tool.ruff.lint]` explicite (E4, E7, E9, F, I, B, UP, RUF, TRY, ISC ; ignore TRY003 et UP042). Le resultat de `ruff check .` ne depend plus de la version de ruff installee.
-  - Tests ajoutes : `tests/core/test_dto_contracts.py`, `tests/core/test_audit_copy.py`.
-- Decisions prises :
-  - B3 : l'adaptateur Odoo vit dans `vorpal/modules/adapters/odoo` (spec 00). La spec 03 ecrit `vorpal/adapters/odoo` : a corriger dans la spec (hors depot).
-  - B5 : `event.handler_failed` est une ligne du catalogue de la spec 01 (emis par core/EventBus, ecoute par alertes et audit), signalee comme evenement systeme.
-  - Corrections a reporter dans les specs (hors depot) : spec 01 (champs de `InvoiceDTO` et `InvoiceLineDTO`, `permissions` dans `ModuleManifest`, `authz` dans `AppContext`, ligne `event.handler_failed`) et spec 03 (chemin de l'adaptateur).
-- Reste a faire (ordre de priorite) :
-  1. Module `dgi` (spec 02) : `vorpal/modules/dgi/` (modeles et interfaces d'abord). Le controle "ligne hors champ => item_code obligatoire" se fait dans ce module.
-  2. Etape 3 (compta Odoo, spec 03), puis `rh_paie` (spec 04).
-  3. Nettoyage facultatif : tests dupliques entre `test_hardening.py` et `test_core_hardening.py` (non touches).
-- Points A_VALIDER :
-  - B6 (module dgi) : recouper `total_vat` avec la somme des (HT ligne x `vat_rate`) selon la regle d'arrondi de la DGI. TODO(A_VALIDER) pose dans `InvoiceDTO.validate_totals`.
-  - Lien exact entre `non_taxable_amount` / `other_taxes` et `total_ht` / `total_ttc` (regle fiscale). TODO(A_VALIDER) pose dans `InvoiceDTO`.
-  - B8 (etape 3) : contre-valeur en devise societe / taux sur `JournalLineDTO`. TODO(A_VALIDER) pose dans `JournalLineDTO`.
-  - Inchange : persistance DB de `AuditLog` / `EventStore` (en memoire) ; regles d'arrondi par devise (`ROUND_HALF_UP`, 2 decimales USD et CDF).
-- Limites connues :
-  - `AuditLog.entries` et la valeur retournee par `record()` exposent encore les dicts internes en lecture : a proteger lors de la persistance DB.
-  - E501 (longueur de ligne) non applique et `ruff format --check` non propre (8 fichiers) : le formatage n'est pas impose par les specs.
-- Commande de test : `pytest --cov=vorpal -q` -> 74 passed, couverture 97 % ; `ruff check .` -> All checks passed ; `mypy --strict vorpal` -> Success: no issues found in 18 source files.
-- Prochain fichier a ecrire : `vorpal/modules/dgi/` (modeles et interfaces, spec 02).
+## 1. Identité du projet
+
+**Vorpal Business Manager** est un projet Python organisé autour d'un
+Core partagé et de modules métier. Le dépôt contient notamment
+`vorpal/core/`, le module `vorpal/modules/ventes/`, les tests sous
+`tests/` et la documentation sous `docs/`.
+
+Les versions et dépendances observées pendant les audits du 20 novembre
+2026 incluaient Python 3.14.8, SQLAlchemy 2.1.9 et pytest 9.2.0.
+Vérifier les versions réellement installées dans l'environnement de
+travail avant de reproduire un résultat.
+
+## 2. Architecture et chemins importants
+
+``` text
+vorpal erp/
+├── docs/
+│   ├── CORE_DOCUMENTATION.md
+│   └── VENTES_DOCUMENTATION.md
+├── HANDOFF.md
+├── pyproject.toml
+├── vorpal/
+│   ├── core/
+│   └── modules/
+│       └── ventes/
+└── tests/
+    └── ventes/
+```
+
+-   `vorpal/core/` : fondations et mécanismes partagés.
+-   `vorpal/modules/` : modules métier.
+-   `tests/` : tests automatisés.
+-   `docs/` : documentation technique.
+-   `HANDOFF.md` : état du projet, règles de reprise et prochaines
+    étapes.
+
+Cette arborescence est un schéma de haut niveau ; consulter le dépôt
+pour l'inventaire complet.
+
+## 3. Documents de référence
+
+1.  **`docs/CORE_DOCUMENTATION.md`** --- architecture, responsabilités,
+    conventions et règles du Core. À lire avant de modifier une
+    fondation partagée.
+2.  **`docs/VENTES_DOCUMENTATION.md`** --- architecture, objets métier,
+    services, ports, persistance, tests et points `A_VALIDER` du module
+    Ventes.
+3.  **`HANDOFF.md`** --- état général du projet, contrôles connus,
+    restrictions et prochaine procédure de reprise.
+
+Si `docs/VENTES_DOCUMENTATION.md` n'est pas encore présent dans le
+dépôt, il s'agit du livrable documentaire préparé pour intégration :
+vérifier sa présence avant de considérer la documentation publiée.
+
+## 4. État du Core
+
+Le Core V1 a été déclaré gelé dans le contexte du projet. Un audit
+antérieur a confirmé son identité avec le tag `core-v1` (commit
+`8d470b7`). La validation de production la plus récente rapportée le 20
+novembre 2026 a donné :
+
+-   Ruff sur `vorpal/` : `All checks passed!`
+-   Mypy strict sur `vorpal/` :
+    `Success: no issues found in 50 source files`.
+
+Ne pas modifier le Core ou ses contrats sans autorisation explicite. Les
+chemins protégés comprennent notamment : - `vorpal/core/` -
+`tests/core/` - `pyproject.toml` (sauf autorisation explicite) -
+`HANDOFF.md` (sauf autorisation explicite) - les contrats et paramètres
+Ventes listés ci-dessous.
+
+## 5. État du module Ventes
+
+Le module se trouve sous `vorpal/modules/ventes/`. Les zones identifiées
+comprennent : - `domain/` : catalogue, clients, erreurs, factures,
+commandes, paiements, devis, relances et totaux ; - `services/` :
+composants communs, clients, commandes, tarification et devis ; -
+`ports/` : repositories, channels, publisher et Unit of Work ; -
+`adapters/persistence/` : mappers, repositories mémoire et SQL,
+migrations, modèles, numérotation, types et Unit of Work ; -
+`settings.py` et `data/sales_settings.json`.
+
+Les tests correspondants se trouvent dans `tests/ventes/` et couvrent le
+domaine, les services, la configuration et la persistance.
+
+### Avancement connu
+
+-   Lots 1 à 3 : configuration/erreurs, domaine et ports documentés
+    comme réalisés.
+-   Lots 4 à 6 : services, adaptateurs/persistance et tests
+    d'intégration/persistance ont été reconstruits et ont fait l'objet
+    de validations successives.
+-   Les audits ont ajouté des tests ciblés pour numérotation, Unit of
+    Work, types, migrations, sérialisation des modèles et champs
+    optionnels des mappers.
+-   Les services applicatifs explicitement identifiés sont
+    `CustomerService`, `PricingService`, `QuoteService` et
+    `OrderService`.
+-   Ne pas déduire que tous les workflows de facturation, paiement,
+    relance ou toutes les intégrations intermodules sont achevés
+    uniquement parce que les objets métier correspondants existent.
+
+Pour les détails techniques, lire `docs/VENTES_DOCUMENTATION.md` et
+vérifier les fichiers réels.
+
+## 6. Qualité : derniers résultats historiques connus
+
+Date de référence : **20 novembre 2026**.
+
+  -----------------------------------------------------------------------
+  Contrôle                            Résultat historique
+  ----------------------------------- -----------------------------------
+  Ruff sur `vorpal/`                  Réussi : `All checks passed!`
+
+  Mypy strict sur `vorpal/`           Réussi : 50 fichiers source, aucune
+                                      erreur
+
+  Pytest / couverture Ventes          586 tests réussis, 99 % de
+                                      couverture rapportée
+
+  `mappers.py`                        100 % après ajout de tests de
+                                      champs optionnels
+
+  `settings.py`                       99 %, une ligne non couverte (ligne
+                                      143)
+
+  Ruff sur `tests/ventes/services/`   32 erreurs au dernier audit
+
+  Mypy sur `tests/ventes/services/`   230 erreurs dans 5 fichiers au
+                                      dernier audit
+
+  Mypy global `vorpal tests`          327 erreurs dans 13 fichiers au
+                                      dernier audit
+  -----------------------------------------------------------------------
+
+Ces chiffres ne sont pas des résultats garantis à l'instant présent. Ils
+ne doivent pas être copiés dans un rapport comme validation actuelle
+sans réexécution.
+
+Commandes de référence depuis la racine, environnement activé :
+
+``` bash
+python -m pytest tests/ventes -q
+python -m pytest -q
+python -m ruff check vorpal
+python -m ruff check tests/ventes/services
+python -m mypy vorpal
+python -m mypy tests/ventes/services --show-error-codes
+python -m mypy vorpal tests
+```
+
+Pour la couverture, l'audit a utilisé `coverage run` directement à cause
+d'un problème rencontré avec pytest-cov sur certains tests SQLAlchemy :
+
+``` bash
+python -m coverage erase
+python -m coverage run --rcfile=/tmp/vorpal-coverage.ini -m pytest tests/ventes
+python -m coverage report --rcfile=/tmp/vorpal-coverage.ini -m
+```
+
+Le fichier `/tmp/vorpal-coverage.ini` est un fichier temporaire local,
+pas nécessairement versionné.
+
+## 7. Règles impératives de travail
+
+-   Ne pas modifier le Core sans autorisation.
+-   Ne pas modifier les contrats protégés ou les paramètres protégés
+    sans autorisation.
+-   Ne pas relâcher Ruff ou Mypy pour faire disparaître les erreurs.
+-   Ne pas ajouter des `type: ignore`, des `Any` ou des exclusions
+    uniquement pour masquer des erreurs.
+-   Ne pas supprimer de tests ni affaiblir les assertions pour faire
+    passer la suite.
+-   Préserver les sauvegardes et ne jamais écraser un backup existant.
+-   Ne pas lancer de générateur qui écrase des tests sans inspection
+    préalable.
+-   Ne pas effectuer de commit ou push sans autorisation explicite.
+-   Faire les changements par lots, avec résultats de tests et contrôles
+    statiques rapportés exactement.
+
+## 8. Fichiers et zones protégés
+
+Les restrictions historiques du projet comprennent : - `vorpal/core/` -
+`tests/core/` - `pyproject.toml` - `HANDOFF.md` -
+`vorpal/modules/ventes/domain/` - `vorpal/modules/ventes/settings.py` -
+`vorpal/modules/ventes/ports/repositories.py` -
+`vorpal/modules/ventes/ports/channels.py` - tests Ventes des lots 1 à 3,
+notamment `tests/ventes/adapters/persistence/test_unit_of_work.py`.
+
+Une autorisation explicite ponctuelle peut lever une restriction pour
+une opération donnée ; ne pas généraliser cette autorisation à d'autres
+travaux.
+
+### Scripts à manier avec prudence
+
+-   `scripts/create_service_tests.py` est un générateur qui peut écraser
+    `tests/ventes/services/test_customers.py`, `test_orders.py`,
+    `test_quotes.py` et crée des sauvegardes dans `_backups_services`.
+    Ne pas l'exécuter sans autorisation et inspection.
+-   `reconstruire_ventes_lots_4_5_6.py` est un script de reconstruction
+    : ne pas le relancer sans comprendre ses effets.
+-   Les sauvegardes sous `_sauvegardes_reconstruction/` et les fichiers
+    `.backup*` doivent être préservés et ne pas être ajoutés au dépôt
+    par inadvertance.
+
+## 9. Points restant à traiter
+
+### Priorité 1 --- qualité des tests
+
+-   Reprendre les erreurs Ruff et Mypy des tests de services.
+-   Corriger les annotations et doubles de test sans modifier le
+    comportement des tests.
+-   Étendre ensuite l'audit aux autres tests concernés par Mypy global.
+-   Réexécuter la suite complète et la couverture.
+
+### Priorité 2 --- règles métier et conformité
+
+Les points suivants restent `A_VALIDER` : - format officiel du NIF DGI
+RDC ; - numérotation fiscale continue par exercice ; - groupes et taux
+de TVA officiels ; - règle d'arrondi USD/CDF ; - représentation des
+remises dans les DTO fiscaux ; - traitement du numéro après rejet d'une
+facture ; - payloads définitifs des événements fiscaux ; - émetteur
+définitif de `payment.received` ; - délais et paliers de relance.
+
+Ne pas transformer les valeurs provisoires en règles officielles sans
+validation.
+
+### Priorité 3 --- intégrations intermodules
+
+-   confirmer et implémenter les contrats avec DGI, Stocks et Trésorerie
+    ;
+-   vérifier les événements et les payloads ;
+-   ajouter des tests contractuels et d'intégration.
+
+### Priorité 4 --- packaging et publication
+
+-   vérifier l'inclusion de `sales_settings.json` dans un build
+    installable ;
+-   vérifier la documentation et les chemins ;
+-   contrôler les fichiers suivis/non suivis et exclure les sauvegardes
+    ;
+-   exécuter les validations finales avant publication.
+
+## 10. Procédure de reprise pour le prochain agent
+
+1.  Lire ce `HANDOFF.md`.
+2.  Lire `docs/CORE_DOCUMENTATION.md`.
+3.  Lire `docs/VENTES_DOCUMENTATION.md`.
+4.  Examiner `git status --short`, la branche et les différences.
+5.  Activer l'environnement virtuel.
+6.  Lancer les tests avant modification.
+7.  Identifier précisément les fichiers autorisés.
+8.  Inspecter les interfaces et tests existants avant de modifier un
+    service.
+9.  Préserver les sauvegardes et éviter les scripts générateurs
+    destructifs.
+10. Modifier par petits lots et relancer les tests ciblés, Ruff et Mypy.
+11. Rapporter les commandes exactes et leurs sorties, sans
+    extrapolation.
+
+## 11. Dernière étape connue
+
+Au moment de cette mise à jour, le projet est en préparation de
+publication sur GitHub (`origin` pointant vers
+`https://github.com/Taigacapitall/ERP-PROJECT.git`, branche `main`). La
+préparation de l'index Git avait été commencée, mais le push n'était pas
+encore confirmé.
+
+Avant de poursuivre, vérifier l'état réel :
+
+``` bash
+git status --short
+git diff --cached --stat
+git diff --cached --check
+```
+
+Ne pas supposer que l'index Git est encore dans le même état qu'au
+dernier échange. Exclure les sauvegardes, fichiers temporaires et
+environnements virtuels. Le commit et le push nécessitent l'autorisation
+explicite de l'utilisateur.
+
+------------------------------------------------------------------------
+
+**Fin du document de transmission.**
