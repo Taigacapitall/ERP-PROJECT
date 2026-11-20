@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 from dataclasses import dataclass
@@ -73,6 +74,9 @@ class AuditLog:
     ) -> AuditEntry:
         seq = len(self._entries) + 1
         ts = timestamp or datetime.now(UTC)
+        # copie defensive : une mutation ulterieure par l'appelant ne doit pas casser la chaine
+        before = copy.deepcopy(before)
+        after = copy.deepcopy(after)
         prev_hash = self._entries[-1].entry_hash if self._entries else GENESIS_HASH
         entry_hash = compute_entry_hash(
             seq=seq,

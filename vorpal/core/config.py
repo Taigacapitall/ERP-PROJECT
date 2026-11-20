@@ -60,7 +60,8 @@ class AppConfig(BaseModel):
             if val is not None and val != "":
                 data[field_name] = val
 
-        secrets = dict(data.get("secrets", {})) if isinstance(data.get("secrets"), dict) else {}
+        raw_secrets = data.get("secrets")
+        secrets: dict[str, object] = dict(raw_secrets) if isinstance(raw_secrets, dict) else {}
         secret_prefix = f"{env_prefix}SECRET_"
         for k, v in os.environ.items():
             if k.startswith(secret_prefix):

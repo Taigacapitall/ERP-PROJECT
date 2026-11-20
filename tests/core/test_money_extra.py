@@ -44,9 +44,9 @@ def test_operators_with_non_money_are_not_supported() -> None:
     with pytest.raises(TypeError):
         m - one
     with pytest.raises(TypeError):
-        m < one
+        operator.lt(m, one)
     with pytest.raises(TypeError):
-        m >= one
+        operator.ge(m, one)
 
 
 def test_add_sub_mixed_currency_rejected() -> None:

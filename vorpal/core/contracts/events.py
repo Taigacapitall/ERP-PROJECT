@@ -7,6 +7,8 @@ CREDIT_NOTE_CERTIFIED = "credit_note.certified"
 JOURNAL_ENTRY_POSTED = "journal.entry.posted"
 PAYROLL_VALIDATED = "payroll.validated"
 PAYMENT_RECEIVED = "payment.received"
+# Evenement systeme emis par l'EventBus (spec 01, item 5) : volontairement hors de
+# OFFICIAL_EVENTS, qui ne contient que les evenements metier du catalogue.
 EVENT_HANDLER_FAILED = "event.handler_failed"
 
 OFFICIAL_EVENTS: tuple[str, ...] = (

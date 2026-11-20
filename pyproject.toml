@@ -11,7 +11,6 @@ dependencies = [
     "pydantic>=2,<3",
     "SQLAlchemy>=2,<3",
     "httpx>=0.27",
-    "PyYAML>=6",
 ]
 
 [project.optional-dependencies]
@@ -32,6 +31,15 @@ addopts = "-ra"
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+
+[tool.ruff.lint]
+# Jeu de regles explicite : le jeu par defaut de ruff change d'une version a l'autre.
+# E501 (longueur de ligne) n'est volontairement pas selectionne.
+select = ["E4", "E7", "E9", "F", "I", "B", "UP", "RUF", "TRY", "ISC"]
+ignore = [
+    "TRY003",  # messages d'erreur detailles (en francais) ecrits a l'endroit du raise
+    "UP042",   # Currency(str, Enum) conserve : StrEnum changerait str(Currency.USD)
+]
 
 [tool.mypy]
 python_version = "3.11"

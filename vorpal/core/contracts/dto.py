@@ -33,6 +33,8 @@ class InvoiceLineDTO(BaseModel):
     unit_price_ht: StrictDecimal = Field(ge=Decimal(0))
     tax_group: str = Field(default="A", min_length=1)
     vat_rate: StrictDecimal = Field(ge=Decimal(0))
+    # Code article : exige par la DGI pour les lignes "hors champ" (controle dans le module dgi).
+    item_code: str | None = Field(default=None, min_length=1)
 
 
 class InvoiceDTO(BaseModel):
@@ -47,11 +49,17 @@ class InvoiceDTO(BaseModel):
     total_ttc: StrictDecimal = Field(ge=Decimal(0))
     invoice_type: Literal["vente", "avoir"] = "vente"
     original_invoice_ref: str | None = None
+    # Mentions obligatoires DGI portees par le contrat (simples porteurs, defaut 0).
+    # TODO(A_VALIDER): lien exact avec total_ht / total_ttc (spec DGI 02, regle fiscale).
+    non_taxable_amount: StrictDecimal = Field(default=Decimal(0), ge=Decimal(0))
+    other_taxes: StrictDecimal = Field(default=Decimal(0), ge=Decimal(0))
 
     @model_validator(mode="after")
     def validate_totals(self) -> InvoiceDTO:
         if self.total_ht + self.total_vat != self.total_ttc:
             raise ValueError("Totaux incohérents: total_ttc doit être égal à total_ht + total_vat.")
+        # TODO(A_VALIDER): recouper total_vat avec la somme des (HT ligne x vat_rate),
+        # selon la regle d'arrondi de la DGI (module dgi).
         lines_ht = sum((ln.quantity * ln.unit_price_ht for ln in self.lines), Decimal(0))
         if abs(lines_ht - self.total_ht) > _CENT * len(self.lines):
             raise ValueError("Totaux incohérents: total_ht diffère de la somme des lignes.")
@@ -77,6 +85,8 @@ class JournalLineDTO(BaseModel):
     debit: StrictDecimal = Field(default=Decimal(0), ge=Decimal(0))
     credit: StrictDecimal = Field(default=Decimal(0), ge=Decimal(0))
     currency: Currency
+    # TODO(A_VALIDER) etape 3 (spec 03) : contre-valeur en devise societe / taux de change
+    # a porter par la ligne si Odoo l'exige (critere "facture CDF dans societe USD").
 
     @model_validator(mode="after")
     def validate_line_side(self) -> JournalLineDTO:

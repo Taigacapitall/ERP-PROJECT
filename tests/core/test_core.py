@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
@@ -50,10 +51,10 @@ from vorpal.core.contracts.events import EVENT_HANDLER_FAILED, INVOICE_CERTIFIED
 
 
 @pytest.fixture
-def app_ctx() -> AppContext:
+def app_ctx() -> Iterator[AppContext]:
     engine = create_db_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
-    return AppContext(
+    yield AppContext(
         event_bus=EventBus(store=InMemoryEventStore()),
         services=ServiceRegistry(),
         config=AppConfig(env="test", db_url="sqlite:///:memory:"),
@@ -61,6 +62,7 @@ def app_ctx() -> AppContext:
         audit=AuditLog(),
         authz=AuthorizationService(),
     )
+    engine.dispose()
 
 
 def test_money_float_rejected_and_currency_mismatch() -> None:
@@ -149,6 +151,40 @@ def test_registry_topological_cycle_missing_and_isolated_failure(app_ctx: AppCon
     reg.stop_all()
     assert m_base.stopped is True
     assert m_ok.stopped is True
+
+
+def test_registry_start_order_follows_dependencies_and_stop_is_reversed(
+    app_ctx: AppContext,
+) -> None:
+    events: list[str] = []
+
+    class OrderedMod(BaseModule):
+        def __init__(self, name: str, depends: list[str]) -> None:
+            self.manifest = ModuleManifest(name=name, version="1.0", depends=depends)
+
+        def install(self, ctx: AppContext) -> None:
+            pass
+
+        def start(self, ctx: AppContext) -> None:
+            events.append(f"start:{self.manifest.name}")
+
+        def stop(self) -> None:
+            events.append(f"stop:{self.manifest.name}")
+
+        def healthcheck(self) -> bool:
+            return True
+
+    reg = ModuleRegistry()
+    # enregistrés volontairement dans le désordre : c -> b -> a
+    reg.register(OrderedMod("c", ["b"]))
+    reg.register(OrderedMod("b", ["a"]))
+    reg.register(OrderedMod("a", []))
+
+    assert reg.resolve_order() == ["a", "b", "c"]
+
+    reg.start_all(app_ctx)
+    reg.stop_all()
+    assert events == ["start:a", "start:b", "start:c", "stop:c", "stop:b", "stop:a"]
 
 
 def test_event_bus_isolation_idempotence_wildcard_and_replay() -> None:
