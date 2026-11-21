@@ -1,0 +1,122 @@
+"""Point d'assemblage (composition root) du module Achats."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import cast
+
+from sqlalchemy.orm import Session, sessionmaker
+
+from vorpal.core.context import AppContext
+from vorpal.core.module import BaseModule, ModuleManifest
+from vorpal.modules.achats.adapters.events import EventBusPurchasePublisher
+from vorpal.modules.achats.adapters.persistence.migrations import apply_achats_migrations
+from vorpal.modules.achats.adapters.persistence.unit_of_work import SqlPurchaseUnitOfWork
+from vorpal.modules.achats.manifest import ACHATS_MANIFEST
+from vorpal.modules.achats.ports.extensions import (
+    StockReceiptNotifier,
+    SupplierInvoiceTemplateImporter,
+)
+from vorpal.modules.achats.services.landed_costs import LandedCostService
+from vorpal.modules.achats.services.purchase_orders import PurchaseOrderService
+from vorpal.modules.achats.services.receipts import GoodsReceiptService
+from vorpal.modules.achats.services.supplier_invoices import SupplierInvoiceImportService
+from vorpal.modules.achats.services.suppliers import SupplierService
+from vorpal.modules.achats.settings import PurchaseSettings
+
+
+class AchatsModule(BaseModule):
+    """Module metier Achats (fournisseurs, bons de commande, receptions, frais d'approche)."""
+
+    manifest: ModuleManifest = ACHATS_MANIFEST
+
+    def __init__(self, settings_path: Path | None = None) -> None:
+        self._settings_path = settings_path
+        self._settings: PurchaseSettings | None = None
+        self._session_factory: sessionmaker[Session] | None = None
+        self.supplier_service: SupplierService | None = None
+        self.purchase_order_service: PurchaseOrderService | None = None
+        self.goods_receipt_service: GoodsReceiptService | None = None
+        self.landed_cost_service: LandedCostService | None = None
+        self.supplier_invoice_import_service: SupplierInvoiceImportService | None = None
+
+    def install(self, ctx: AppContext) -> None:
+        self._settings = PurchaseSettings.from_json_file(self._settings_path)
+        apply_achats_migrations(ctx.db)
+        self._session_factory = sessionmaker(bind=ctx.db)
+
+    def start(self, ctx: AppContext) -> None:
+        if self._settings is None or self._session_factory is None:
+            self.install(ctx)
+        assert self._settings is not None
+        assert self._session_factory is not None
+
+        settings = self._settings
+        factory = self._session_factory
+
+        def uow_factory() -> SqlPurchaseUnitOfWork:
+            return SqlPurchaseUnitOfWork(factory)
+
+        publisher = EventBusPurchasePublisher(ctx.event_bus, clock=ctx.clock)
+        stock_notifier = cast(
+            StockReceiptNotifier | None,
+            ctx.services.get_optional(cast(type[object], StockReceiptNotifier)),
+        )
+        invoice_importer = cast(
+            SupplierInvoiceTemplateImporter | None,
+            ctx.services.get_optional(cast(type[object], SupplierInvoiceTemplateImporter)),
+        )
+
+        self.supplier_service = SupplierService(
+            uow_factory=uow_factory,
+            audit=ctx.audit,
+            authz=ctx.authz,
+            clock=ctx.clock,
+        )
+        self.purchase_order_service = PurchaseOrderService(
+            uow_factory=uow_factory,
+            settings=settings,
+            audit=ctx.audit,
+            authz=ctx.authz,
+            publisher=publisher,
+            clock=ctx.clock,
+        )
+        self.goods_receipt_service = GoodsReceiptService(
+            uow_factory=uow_factory,
+            settings=settings,
+            audit=ctx.audit,
+            authz=ctx.authz,
+            publisher=publisher,
+            stock_notifier=stock_notifier,
+            clock=ctx.clock,
+        )
+        self.landed_cost_service = LandedCostService(
+            uow_factory=uow_factory,
+            settings=settings,
+            audit=ctx.audit,
+            authz=ctx.authz,
+            publisher=publisher,
+            stock_notifier=stock_notifier,
+            clock=ctx.clock,
+        )
+        self.supplier_invoice_import_service = SupplierInvoiceImportService(
+            audit=ctx.audit,
+            authz=ctx.authz,
+            importer=invoice_importer,
+            publisher=publisher,
+            clock=ctx.clock,
+        )
+
+    def stop(self) -> None:
+        self.supplier_service = None
+        self.purchase_order_service = None
+        self.goods_receipt_service = None
+        self.landed_cost_service = None
+        self.supplier_invoice_import_service = None
+
+    def healthcheck(self) -> bool:
+        return (
+            self._settings is not None
+            and self._session_factory is not None
+            and self.purchase_order_service is not None
+        )

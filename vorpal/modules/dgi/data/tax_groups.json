@@ -1,0 +1,45 @@
+{
+  "version": "2026.1",
+  "groups": [
+    {
+      "code": "TG-01",
+      "label": "TVA standard",
+      "rate": "0.16",
+      "valid_from": "2020-01-01",
+      "valid_to": null,
+      "out_of_scope": false
+    },
+    {
+      "code": "TG-02",
+      "label": "Exonere / taux zero",
+      "rate": "0.00",
+      "valid_from": "2020-01-01",
+      "valid_to": null,
+      "out_of_scope": false
+    },
+    {
+      "code": "TG-HC",
+      "label": "Hors champ",
+      "rate": "0.00",
+      "valid_from": "2020-01-01",
+      "valid_to": null,
+      "out_of_scope": true
+    },
+    {
+      "code": "TG-LEGACY-01",
+      "label": "Ancien groupe transitoire (exemple historique)",
+      "rate": "0.16",
+      "valid_from": "2020-01-01",
+      "valid_to": "2025-12-31",
+      "out_of_scope": false
+    },
+    {
+      "code": "TG-NEW-2026",
+      "label": "Groupe actif a partir de 2026 (exemple revision)",
+      "rate": "0.16",
+      "valid_from": "2026-01-01",
+      "valid_to": null,
+      "out_of_scope": false
+    }
+  ]
+}

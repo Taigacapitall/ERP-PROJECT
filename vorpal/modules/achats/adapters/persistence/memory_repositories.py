@@ -1,0 +1,168 @@
+"""Implementations en memoire des ports de persistance du module Achats (tests)."""
+
+from __future__ import annotations
+
+from copy import deepcopy
+
+from vorpal.modules.achats.domain.landed_costs import LandedCostDocument
+from vorpal.modules.achats.domain.purchase_orders import PurchaseOrder
+from vorpal.modules.achats.domain.receipts import GoodsReceipt
+from vorpal.modules.achats.domain.suppliers import Supplier
+from vorpal.modules.achats.ports.repositories import (
+    GoodsReceiptRepository,
+    LandedCostRepository,
+    PurchaseNumberSequence,
+    PurchaseOrderRepository,
+    SupplierRepository,
+)
+from vorpal.modules.achats.ports.unit_of_work import PurchaseUnitOfWork
+
+
+class InMemorySupplierRepository(SupplierRepository):
+    def __init__(self) -> None:
+        self._items: dict[str, Supplier] = {}
+
+    def get(self, supplier_id: str) -> Supplier | None:
+        item = self._items.get(supplier_id)
+        return deepcopy(item) if item is not None else None
+
+    def add(self, supplier: Supplier) -> None:
+        self._items[supplier.id] = deepcopy(supplier)
+
+    def list_all(self) -> list[Supplier]:
+        return [deepcopy(item) for item in self._items.values()]
+
+
+class InMemoryPurchaseOrderRepository(PurchaseOrderRepository):
+    def __init__(self) -> None:
+        self._items: dict[str, PurchaseOrder] = {}
+
+    def get(self, order_id: str) -> PurchaseOrder | None:
+        item = self._items.get(order_id)
+        return deepcopy(item) if item is not None else None
+
+    def get_by_number(self, number: str) -> PurchaseOrder | None:
+        for item in self._items.values():
+            if item.number == number:
+                return deepcopy(item)
+        return None
+
+    def add(self, order: PurchaseOrder) -> None:
+        self._items[order.id] = deepcopy(order)
+
+    def list_all(self) -> list[PurchaseOrder]:
+        return [deepcopy(item) for item in self._items.values()]
+
+
+class InMemoryGoodsReceiptRepository(GoodsReceiptRepository):
+    def __init__(self) -> None:
+        self._items: dict[str, GoodsReceipt] = {}
+
+    def get(self, receipt_id: str) -> GoodsReceipt | None:
+        item = self._items.get(receipt_id)
+        return deepcopy(item) if item is not None else None
+
+    def get_by_number(self, number: str) -> GoodsReceipt | None:
+        for item in self._items.values():
+            if item.number == number:
+                return deepcopy(item)
+        return None
+
+    def add(self, receipt: GoodsReceipt) -> None:
+        self._items[receipt.id] = deepcopy(receipt)
+
+    def list_by_order(self, purchase_order_id: str) -> list[GoodsReceipt]:
+        return [
+            deepcopy(item)
+            for item in self._items.values()
+            if item.purchase_order_id == purchase_order_id
+        ]
+
+    def list_all(self) -> list[GoodsReceipt]:
+        return [deepcopy(item) for item in self._items.values()]
+
+
+class InMemoryLandedCostRepository(LandedCostRepository):
+    def __init__(self) -> None:
+        self._items: dict[str, LandedCostDocument] = {}
+
+    def get(self, landed_cost_id: str) -> LandedCostDocument | None:
+        item = self._items.get(landed_cost_id)
+        return deepcopy(item) if item is not None else None
+
+    def add(self, document: LandedCostDocument) -> None:
+        self._items[document.id] = deepcopy(document)
+
+    def list_by_receipt(self, goods_receipt_id: str) -> list[LandedCostDocument]:
+        return [
+            deepcopy(item)
+            for item in self._items.values()
+            if item.goods_receipt_id == goods_receipt_id
+        ]
+
+    def list_all(self) -> list[LandedCostDocument]:
+        return [deepcopy(item) for item in self._items.values()]
+
+
+class InMemoryPurchaseNumberSequence(PurchaseNumberSequence):
+    def __init__(self) -> None:
+        self._counters: dict[tuple[str, int], int] = {}
+
+    def next_number(self, sequence_key: str, fiscal_year: int) -> str:
+        key = (sequence_key, fiscal_year)
+        nxt = self._counters.get(key, 0) + 1
+        self._counters[key] = nxt
+        return str(nxt)
+
+
+class InMemoryPurchaseUnitOfWork(PurchaseUnitOfWork):
+    """Unit of Work en memoire avec snapshots pour rollback deterministe."""
+
+    def __init__(
+        self,
+        suppliers: InMemorySupplierRepository | None = None,
+        purchase_orders: InMemoryPurchaseOrderRepository | None = None,
+        goods_receipts: InMemoryGoodsReceiptRepository | None = None,
+        landed_costs: InMemoryLandedCostRepository | None = None,
+        sequences: InMemoryPurchaseNumberSequence | None = None,
+    ) -> None:
+        # Références concrètes privées pour gérer les snapshots.
+        self._suppliers_repo = suppliers if suppliers is not None else InMemorySupplierRepository()
+        self._purchase_orders_repo = (
+            purchase_orders if purchase_orders is not None else InMemoryPurchaseOrderRepository()
+        )
+        self._goods_receipts_repo = (
+            goods_receipts if goods_receipts is not None else InMemoryGoodsReceiptRepository()
+        )
+        self._landed_costs_repo = (
+            landed_costs if landed_costs is not None else InMemoryLandedCostRepository()
+        )
+        self._sequences_repo = (
+            sequences if sequences is not None else InMemoryPurchaseNumberSequence()
+        )
+
+        # Interfaces publiques définies par PurchaseUnitOfWork.
+        self.suppliers = self._suppliers_repo
+        self.purchase_orders = self._purchase_orders_repo
+        self.goods_receipts = self._goods_receipts_repo
+        self.landed_costs = self._landed_costs_repo
+        self.sequences = self._sequences_repo
+
+        self._take_snapshot()
+
+    def _take_snapshot(self) -> None:
+        self._snapshot_suppliers = deepcopy(self._suppliers_repo._items)
+        self._snapshot_orders = deepcopy(self._purchase_orders_repo._items)
+        self._snapshot_receipts = deepcopy(self._goods_receipts_repo._items)
+        self._snapshot_landed_costs = deepcopy(self._landed_costs_repo._items)
+        self._snapshot_counters = deepcopy(self._sequences_repo._counters)
+
+    def commit(self) -> None:
+        self._take_snapshot()
+
+    def rollback(self) -> None:
+        self._suppliers_repo._items = deepcopy(self._snapshot_suppliers)
+        self._purchase_orders_repo._items = deepcopy(self._snapshot_orders)
+        self._goods_receipts_repo._items = deepcopy(self._snapshot_receipts)
+        self._landed_costs_repo._items = deepcopy(self._snapshot_landed_costs)
+        self._sequences_repo._counters = deepcopy(self._snapshot_counters)

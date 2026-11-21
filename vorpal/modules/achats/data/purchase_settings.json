@@ -1,0 +1,23 @@
+{
+  "company_name": "Entreprise A_VALIDER",
+  "default_currency": "USD",
+  "default_payment_terms_days": 30,
+  "default_vat_rate": "0.16",
+  "landed_cost_allocation_method": "BY_AMOUNT",
+  "sequences": {
+    "purchase_order": {
+      "prefix": "BC",
+      "year_separator": "-",
+      "padding": 5
+    },
+    "goods_receipt": {
+      "prefix": "REC",
+      "year_separator": "-",
+      "padding": 5
+    }
+  },
+  "metadata": {
+    "status": "A_VALIDER",
+    "notes": "Parametres provisoires du module Achats (taux, delais et formats de numerotation a valider)."
+  }
+}

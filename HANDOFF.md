@@ -293,3 +293,67 @@ explicite de l'utilisateur.
 ------------------------------------------------------------------------
 
 **Fin du document de transmission.**
+
+---
+
+## MISE À JOUR DE SESSION — 20 NOVEMBRE 2026
+
+### 1. Module ACHATS — validation terminée pour cette session
+
+Résultats de validation :
+- Suite complète : 595 tests réussis.
+- Couverture du module Achats : 88 %.
+- Rapport HTML de couverture généré dans `htmlcov/`.
+- Ruff : aucune erreur sur le périmètre Achats vérifié.
+- Mypy : aucune erreur sur les 33 fichiers source vérifiés.
+
+Couverture des principaux composants :
+- Services fournisseurs : 100 %.
+- Services coûts d'acquisition : 95 %.
+- Services réceptions : 93 %.
+- Factures fournisseurs : 93 %.
+- Services commandes d'achat : 82 %.
+- Persistance SQL : 81 %.
+- Domaine commandes : 75 %.
+- Calculs des totaux : 73 %.
+- Types SQL : 64 %.
+
+Les améliorations de couverture restantes sont reportées.
+Ne pas reprendre immédiatement les tests Achats.
+
+### 2. Incident SQLAlchemy observé
+
+Un précédent lancement complet avec couverture avait produit 20 échecs et une erreur :
+`TypeError: 'InternalTraversal' object is not callable`.
+
+Diagnostic :
+- SQLAlchemy installé : 2.1.9.
+- `pip check` : aucune dépendance cassée.
+- Le test SQL ciblé a ensuite réussi.
+- La suite complète a ensuite réussi : 595 passed.
+- Le nouveau lancement avec couverture a également réussi : 595 passed.
+
+Aucune modification de SQLAlchemy, des modèles ou des dépôts SQL n'a été effectuée pour cet incident.
+Ne pas considérer l'incident comme une incompatibilité confirmée.
+
+### 3. Prochaine étape
+
+Mettre le module Achats en pause.
+
+Reprendre le travail sur le prochain module métier : VENTES.
+
+Avant toute intervention :
+- Consulter l'état actuel du module et les travaux déjà documentés.
+- Ne pas refaire les tâches déjà validées.
+- Conserver l'architecture et les conventions du projet.
+- Vérifier les tests, la couverture, Ruff et Mypy selon le périmètre retenu.
+
+### 4. Règles de travail
+
+- Ne pas modifier le code sans audit préalable.
+- Ne pas ajouter de tests superficiels uniquement pour augmenter la couverture.
+- Ne pas modifier les dépendances sans diagnostic établi.
+- Ne pas supprimer de fichiers utiles.
+- Ne pas effectuer de commit ou de push sans demande explicite.
+- Préserver les travaux et décisions déjà consignés dans ce HANDOFF.
+

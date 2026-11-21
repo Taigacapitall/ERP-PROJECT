@@ -1,0 +1,170 @@
+"""Fixtures partagees pour les tests du module Achats."""
+
+from __future__ import annotations
+
+from collections.abc import Iterator
+from datetime import date, datetime, timezone
+from decimal import Decimal
+
+import pytest
+from sqlalchemy.orm import Session, sessionmaker
+
+from vorpal.core.audit import AuditLog
+from vorpal.core.config import AppConfig
+from vorpal.core.context import AppContext
+from vorpal.core.db import create_db_engine
+from vorpal.core.events import EventBus, InMemoryEventStore
+from vorpal.core.money import Currency, Money
+from vorpal.core.partners import Partner
+from vorpal.core.security import AuthorizationService, Permission, Role, User
+from vorpal.core.services import ServiceRegistry
+from vorpal.modules.achats.adapters.persistence.memory_repositories import InMemoryPurchaseUnitOfWork
+from vorpal.modules.achats.adapters.persistence.migrations import apply_achats_migrations
+from vorpal.modules.achats.adapters.persistence.unit_of_work import SqlPurchaseUnitOfWork
+from vorpal.modules.achats.domain.purchase_orders import PurchaseOrder, PurchaseOrderLine
+from vorpal.modules.achats.domain.suppliers import Supplier
+from vorpal.modules.achats.manifest import ACHATS_PERMISSIONS
+from vorpal.modules.achats.settings import PurchaseSettings
+
+
+@pytest.fixture
+def fixed_clock() -> datetime:
+    return datetime(2026, 11, 20, 10, 0, 0, tzinfo=timezone.utc)
+
+
+@pytest.fixture
+def clock_fn(fixed_clock: datetime):
+    def _clock() -> datetime:
+        return fixed_clock
+
+    return _clock
+
+
+@pytest.fixture
+def settings() -> PurchaseSettings:
+    return PurchaseSettings.from_json_file()
+
+
+@pytest.fixture
+def audit_log() -> AuditLog:
+    return AuditLog()
+
+
+@pytest.fixture
+def authz_service() -> AuthorizationService:
+    authz = AuthorizationService()
+    for code in ACHATS_PERMISSIONS:
+        authz.register_module_permissions("achats", [Permission(code)])
+    return authz
+
+
+@pytest.fixture
+def buyer_user() -> User:
+    role = Role(
+        name="buyer",
+        permissions=frozenset(ACHATS_PERMISSIONS),
+    )
+    return User(
+        id="u-1",
+        username="josue",
+        roles=(role,),
+        is_active=True,
+    )
+
+@pytest.fixture
+def readonly_user() -> User:
+    role = Role(name="reader", permissions={"achats.view"})
+    return User(id="u-2", username="lecteur", roles={role}, is_active=True)
+
+
+@pytest.fixture
+def app_context(
+    settings: PurchaseSettings,
+    audit_log: AuditLog,
+    authz_service: AuthorizationService,
+    clock_fn,
+) -> Iterator[AppContext]:
+    engine = create_db_engine("sqlite:///:memory:")
+    apply_achats_migrations(engine)
+    ctx = AppContext(
+        event_bus=EventBus(store=InMemoryEventStore()),
+        services=ServiceRegistry(),
+        config=AppConfig(env="test", db_url="sqlite:///:memory:", default_currency=settings.default_currency),
+        db=engine,
+        audit=audit_log,
+        authz=authz_service,
+        clock=clock_fn,
+    )
+    try:
+        yield ctx
+    finally:
+        engine.dispose()
+
+
+@pytest.fixture
+def sql_session_factory(app_context: AppContext) -> sessionmaker[Session]:
+    return sessionmaker(bind=app_context.db)
+
+
+@pytest.fixture
+def sql_uow_factory(sql_session_factory: sessionmaker[Session]):
+    def _factory() -> SqlPurchaseUnitOfWork:
+        return SqlPurchaseUnitOfWork(sql_session_factory)
+
+    return _factory
+
+
+@pytest.fixture
+def memory_uow_factory():
+    shared_uow = InMemoryPurchaseUnitOfWork()
+
+    def _factory() -> InMemoryPurchaseUnitOfWork:
+        return shared_uow
+
+    return _factory
+
+
+@pytest.fixture
+def sample_supplier() -> Supplier:
+    partner = Partner(
+        id="SUP-001",
+        name="Mines & Logistique Katanga",
+        partner_type="fournisseur",
+        nif="NIF-123456",
+        rccm="CD/LSH/RCCM/24-B-001",
+        address="Av. Kasavubu, Lubumbashi",
+    )
+    return Supplier(
+        id="SUP-001",
+        partner=partner,
+        payment_terms_days=30,
+        preferred_currency=Currency.USD,
+    )
+
+
+@pytest.fixture
+def sample_order() -> PurchaseOrder:
+    return PurchaseOrder(
+        id="PO-001",
+        supplier_id="SUP-001",
+        order_date=date(2026, 11, 20),
+        currency=Currency.USD,
+        lines=[
+            PurchaseOrderLine(
+                line_id="L-1",
+                item_code="POMPE-A1",
+                designation="Pompe centrifuge",
+                quantity_ordered=Decimal("2"),
+                unit_price_ht=Money(Decimal("500.00"), Currency.USD),
+                vat_rate=Decimal("0.16"),
+            ),
+            PurchaseOrderLine(
+                line_id="L-2",
+                item_code="JOINT-B2",
+                designation="Kit joints renforces",
+                quantity_ordered=Decimal("10"),
+                unit_price_ht=Money(Decimal("50.00"), Currency.USD),
+                vat_rate=Decimal("0.16"),
+            ),
+        ],
+    )
