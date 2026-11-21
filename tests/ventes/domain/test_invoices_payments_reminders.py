@@ -581,8 +581,31 @@ class TestSalesInvoice:
         assert validated.status == InvoiceStatus.VALIDATED
 
     def test_mark_certified_is_idempotent(self) -> None:
-        certified = replace(invoice(), status=InvoiceStatus.CERTIFIED)
-        assert certified.mark_certified(None) is certified  # type: ignore[arg-type]
+        dto = CertifiedInvoiceDTO(
+            number="FAC-1",
+            invoice_date=date(2026, 11, 1),
+            seller=PartyInfoDTO(name="Seller"),
+            customer=PartyInfoDTO(name="Customer"),
+            lines=[
+                InvoiceLineDTO(
+                    designation="Service",
+                    quantity=Decimal("2"),
+                    unit_price_ht=Decimal("100"),
+                    vat_rate=Decimal("0.16"),
+                )
+            ],
+            currency=Currency.USD,
+            total_ht=Decimal("200"),
+            total_vat=Decimal("32"),
+            total_ttc=Decimal("232"),
+            device_id="DEVICE-1",
+            auth_code="AUTH-1",
+            qr_code="QR-1",
+            certified_at=datetime(2026, 11, 2, 10, 0),
+            counters={"invoice": 1},
+        )
+        certified = invoice().validate(customer=customer(), assigned_number="FAC-1").mark_certified(dto)
+        assert certified.mark_certified(dto) is certified
 
     def test_mark_rejected_requires_validated_status(self) -> None:
         with pytest.raises(SalesConflictError):

@@ -7,6 +7,7 @@ from decimal import Decimal
 
 import pytest
 
+from tests.dgi.conftest import make_valid_invoice
 from vorpal.core.errors import ComplianceError
 from vorpal.core.events import Event
 from vorpal.core.money import Currency, Money
@@ -17,14 +18,15 @@ from vorpal.modules.dgi.models import (
     CertificationStatus,
     InvoiceDTO,
     InvoiceLineDTO,
-    PartyTaxInfo,
     strict_decimal,
 )
 from vorpal.modules.dgi.renderers import HtmlRenderer, TextRenderer
 from vorpal.modules.dgi.service import CertificationService
-from vorpal.modules.dgi.state_machine import ensure_not_certified_immutable, transition_invoice_status
+from vorpal.modules.dgi.state_machine import (
+    ensure_not_certified_immutable,
+    transition_invoice_status,
+)
 from vorpal.modules.dgi.tax_groups import TaxGroupTable
-from tests.dgi.conftest import make_valid_invoice
 
 
 def test_strict_decimal_rejects_float() -> None:

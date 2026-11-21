@@ -25,6 +25,7 @@ from vorpal.modules.ventes.adapters.persistence.models import (
 )
 from vorpal.modules.ventes.domain.catalog import PriceList, SalesItem
 from vorpal.modules.ventes.domain.customers import ContactPerson, Customer, PaymentTerms
+from vorpal.modules.ventes.domain.errors import SalesComplianceError
 from vorpal.modules.ventes.domain.invoices import (
     FiscalStamp,
     InvoiceLine,
@@ -349,6 +350,22 @@ def invoice_from_model(header: SalesInvoiceModel, line_models: list[InvoiceLineM
             qr_code=header.stamp_qr_code,
             certified_at=header.stamp_certified_at,
             counters=decode_typed_counters(header.stamp_counters_json),
+        )
+    raw_stamp = (
+        header.stamp_device_id,
+        header.stamp_auth_code,
+        header.stamp_qr_code,
+        header.stamp_certified_at,
+    )
+    if header.status == InvoiceStatus.CERTIFIED.value and (
+        stamp is None or not (stamp.device_id.strip() and stamp.auth_code.strip() and stamp.qr_code.strip())
+    ):
+        raise SalesComplianceError(
+            f"Donnees incoherentes : la facture '{header.id}' est CERTIFIED sans cachet fiscal complet."
+        )
+    if stamp is None and any(value is not None for value in raw_stamp):
+        raise SalesComplianceError(
+            f"Donnees incoherentes : cachet fiscal partiel sur la facture '{header.id}'."
         )
     inv_type: Literal["vente", "avoir"] = "avoir" if header.invoice_type == "avoir" else "vente"
     return SalesInvoice(

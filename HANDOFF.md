@@ -1,6 +1,6 @@
 # HANDOFF --- Vorpal Business Manager
 
-**Dernière mise à jour documentaire : 20 novembre 2026**\
+**Dernière mise à jour documentaire : 21 novembre 2026**\
 **Contexte :** préparation de la publication du dépôt GitHub et
 transmission aux prochains agents.
 
@@ -238,6 +238,8 @@ validation.
 
 ### Priorité 3 --- intégrations intermodules
 
+*(Mise à jour : le circuit Ventes ↔ DGI est implémenté et testé, voir §12. Restent : Stocks, Trésorerie, persistance de l'outbox DGI.)*
+
 -   confirmer et implémenter les contrats avec DGI, Stocks et Trésorerie
     ;
 -   vérifier les événements et les payloads ;
@@ -289,6 +291,80 @@ Ne pas supposer que l'index Git est encore dans le même état qu'au
 dernier échange. Exclure les sauvegardes, fichiers temporaires et
 environnements virtuels. Le commit et le push nécessitent l'autorisation
 explicite de l'utilisateur.
+
+------------------------------------------------------------------------
+
+## 12. Intégration Ventes ↔ DGI (circuit de certification fiscale)
+
+Section fusionnée le 21 novembre 2026 depuis l'ancien `HANDOFF_VORPAL.md` (sauvegardé en `HANDOFF_VORPAL.md.backup-fusion`). Branche : `feat/ventes-dgi-circuit`. Aucun commit créé. Les restrictions du §8 restent valables ; `HANDOFF.md` n'a été modifié que pour cette fusion, sur autorisation explicite de l'utilisateur.
+
+### 12.1 Architecture réelle
+1. `InvoiceService.validate_and_submit` (Ventes) valide, numérote (séquence SQL) et enregistre la facture en SQL.
+2. Après commit, `PostCommitBatch` appelle `EventBusSalesPublisher`, qui publie `invoice.ready_for_certification`. Le payload porte l'`InvoiceDTO` Core sérialisé (`{"invoice": ...}`).
+3. `DgiModule.start()` souscrit `InvoiceReadyForCertificationHandler`. Ce handler convertit (via `map_internal_tax`), puis appelle `certify_invoice()`.
+4. DGI publie `invoice.certified` (avec `certified_at`) ou `invoice.rejected`.
+5. `VentesModule.start()` souscrit `CertificationResultHandlers`. Ils retrouvent la facture par numéro, appliquent `mark_certified` / `mark_rejected` et enregistrent en transaction SQL.
+6. Au rechargement, le mapper refuse toute facture CERTIFIED sans cachet complet.
+
+Les deux modules ont `depends=[]` : ils ne communiquent que par événements. Le Core et le tag `core-v1` sont inchangés (vérifié par `git diff core-v1 -- vorpal/core`).
+
+### 12.2 Fichiers
+**Créés** : `dgi/event_handlers.py`, `dgi/module.py`, `ventes/adapters/events.py`, `ventes/manifest.py`, `ventes/module.py`, `ventes/services/invoices.py`, `ventes/services/certification_results.py`, `tests/dgi/test_certification_integrity.py`, `tests/dgi/test_event_wiring.py`, `tests/ventes/domain/test_certified_stamp_conflict.py`, `tests/integration/` (`__init__.py`, `test_ventes_dgi_circuit.py`).
+**Modifiés** : `dgi/service.py`, `ventes/domain/invoices.py`, `ventes/adapters/persistence/mappers.py`, `tests/ventes/domain/test_invoices_payments_reminders.py` (un seul test adapté, voir §3.2).
+Des modifications locales antérieures à ce travail existent aussi (`dgi/__init__.py`, `dgi/manifest.py`, `dgi/clients/mock.py`, tests DGI). Les fichiers `*.backup-*` et `synchroniser_vorpal.py` ne doivent PAS être commités.
+
+### 12.3 Problèmes corrigés
+1. **Certification prématurée** : le cachet est vérifié (4 champs + `certified_at` ISO valide) AVANT toute transition CERTIFIED. Un cachet incomplet passe en RETRY avec le code `INCOMPLETE_STAMP`, puis en REJECTED si les tentatives sont épuisées. `invoice.certified` n'est jamais publié dans ce cas.
+2. **Idempotence** : `mark_certified` renvoie la facture si le cachet est identique (dates comparées en UTC), et lève `SalesConflictError` si le cachet diffère. Le test `test_mark_certified_is_idempotent` passait `None` ; il rejoue maintenant le même cachet. Côté DGI, un numéro de série déjà certifié refuse d'hériter du cachet si le TTC ou la date diffère.
+3. **Raccordement** : publisher, `module.py` des deux modules, souscriptions dans `start()`.
+4. **Rechargement SQL** : erreur explicite pour CERTIFIED sans cachet complet, et pour un cachet partiel. Schéma SQL inchangé.
+5. **Reprises** : l'indisponibilité temporaire garde RETRY ; certification ou rejet après reprise passe par le même circuit et atteint Ventes.
+6. **Taxes** : `certify()` et le handler utilisent `map_internal_tax`. Aucune correspondance A/E → TG-* n'est écrite en dur. Sans correspondance, DGI refuse (`NOT_TRANSMITTABLE`) et Ventes passe REJECTED avec un motif clair.
+
+### 12.4 Tests
+Suite complète : **644 passés, 0 échec** (base : 612). Mypy strict sur `vorpal` : OK (106 fichiers). Ruff sur `vorpal` : OK. Ruff sur `vorpal tests` : 34 erreurs, identiques à la base (32 dans `tests/ventes/services/`, 2 dans `tests/ventes/adapters/persistence/test_unit_of_work.py`, fichiers protégés non touchés).
+Les tests utilisent SQLite en mémoire et `MockMCFClient` avec une table fiscale de test déclarée explicitement. **Ce n'est pas une homologation DGI.**
+
+### 12.5 Limites restantes
+- **Outbox et journal DGI en mémoire** : un redémarrage perd les reprises en attente. Aucun planificateur n'appelle `DgiModule.process_retries()`.
+- **Crash pendant la soumission** : si le client fiscal lève une exception réseau, l'entrée reste en SENT et n'est pas reprise. Il faudrait un `get_status` avant toute resoumission.
+- **Rejet après cachet incomplet** : une facture peut avoir été certifiée par le dispositif sans que la réponse soit exploitable. Il faudrait interroger `get_status` avant de rejeter.
+- **Resoumission après rejet** : le handler DGI ignore un numéro déjà connu de l'outbox. Une facture rejetée puis rouverte (`reopen_after_rejection`) n'est donc pas encore resoumettable sous le même numéro, et `InvoiceService` n'expose pas la réouverture. Dépend de la règle A_VALIDER sur le numéro après rejet.
+- **Mapping A/E → TG-*** absent de la configuration de production : toute certification réelle sera refusée tant qu'il n'est pas déclaré et validé.
+- **Compteurs fiscaux** : `counters={}` (limite du modèle DGI).
+- **Avoirs** : hors de `InvoiceService` (workflow spécialisé requis).
+- **`payment.received`** : payload provisoire (A_VALIDER).
+- **Document client** : seul le contrôle de `to_invoice_dto` sur facture certifiée est testé ; les renderers DGI ne sont pas branchés.
+
+### 12.6 Décisions d'architecture
+- Le payload porte le DTO Core complet, pour que DGI ne lise jamais la base de Ventes.
+- La conversion Core → DGI est extraite dans `convert_core_invoice`, partagée par `certify()` et le handler.
+- Le client fiscal et la table de taxes sont injectés explicitement dans `DgiModule` (jamais de Mock implicite).
+- Un handler en erreur est rejoué par l'EventBus ; tous les handlers sont idempotents.
+
+### 12.7 Prochaines étapes
+1. Persistance SQL de l'outbox et du journal DGI, avec migrations.
+2. Planificateur de reprises et `get_status` avant resoumission ou rejet.
+3. Service de réouverture et resoumission des factures rejetées.
+4. Validation fiscale : mapping A/E, numérotation, arrondis, compteurs, homologation officielle.
+5. Brancher les renderers DGI pour produire le document client.
+
+### 12.8 État au 21 novembre 2026 (fin du lot Ventes ↔ DGI, avant le lot persistance)
+**Vérifié en dernier :** 644 tests passés, 0 échec (base 612, +32). Mypy strict sur `vorpal` : 106 fichiers, aucune erreur. Ruff sur `vorpal` : OK. Core identique au tag `core-v1`. Aucun commit.
+
+**Opérationnel :** facture validée → SQL → `invoice.ready_for_certification` après commit → DGI (souscription réelle) → certification, rejet ou reprise → `invoice.certified` / `invoice.rejected` → Ventes met à jour SQL → rechargement cohérent avec cachet complet.
+
+**Non opérationnel (voir §5) :** persistance de l'outbox et du journal DGI, planificateur de reprises, resoumission après rejet, avoirs, renderers du document client, mapping fiscal A/E → TG-*.
+
+**Hygiène Git avant tout commit :**
+- Exclure : `synchroniser_vorpal.py` et tous les `*.backup-*` (`dgi/manifest.py.backup-20261121-104852`, `*.backup-pre-circuit`, `*.backup-pre-lot2`, `*.backup-pre-2b`, `HANDOFF_VORPAL.md.backup-pre-maj`).
+- À trancher : les modifications locales antérieures (`dgi/__init__.py`, `dgi/manifest.py`, `dgi/clients/mock.py`, tests DGI) et `tests/dgi/test_core_adapter.py` sont non commitées ; le dernier commit indique « tests not valided yet » pour DGI.
+- Ne pas modifier sans autorisation : `HANDOFF.md`, `pyproject.toml`, `vorpal/core/`, `ventes/domain/` (hors `invoices.py`, autorisé ici).
+
+### 12.9 Prochain lot (décidé, non commencé)
+Persistance SQL de l'outbox DGI avec `get_status` avant resoumission, puis réouverture des factures rejetées.
+Contraintes : migrations additives uniquement (jamais de suppression), tables préfixées `dgi_`, aucune modification du Core, tests SQLite en mémoire, idempotence conservée.
+Questions ouvertes : règle de conservation du numéro après rejet (A_VALIDER) ; `get_status` doit être appelé avant tout rejet ou resoumission.
 
 ------------------------------------------------------------------------
 
@@ -357,3 +433,204 @@ Avant toute intervention :
 - Ne pas effectuer de commit ou de push sans demande explicite.
 - Préserver les travaux et décisions déjà consignés dans ce HANDOFF.
 
+
+---
+
+## MISE À JOUR DE SESSION — LOT 3 VENTES ↔ DGI
+**Date : 21 novembre 2026**
+**Statut : VALIDÉ — tests et contrôles statiques réussis**
+
+Cette section actualise les anciennes limites et prochaines étapes
+décrites aux sections 12.5, 12.7, 12.8 et 12.9. En cas de divergence,
+cette mise à jour est la référence la plus récente pour le circuit
+Ventes ↔ DGI.
+
+### 1. Persistance SQL DGI réalisée
+
+Fichier ajouté : `vorpal/modules/dgi/persistence.py`.
+
+- Modèle SQL `DgiOutboxModel`, table `dgi_outbox`.
+- Modèle SQL `DgiJournalModel`, table `dgi_journal`.
+- Migration DGI version 1, avec création ciblée des tables `dgi_*`.
+- `SqlOutboxRepository` pour la persistance des demandes et reprises.
+- `SqlFiscalJournal` pour le journal fiscal et sa chaîne d'intégrité.
+- Sérialisation et désérialisation des DTO DGI.
+- Les dates sont stockées sous forme ISO afin de préserver les
+  informations de fuseau horaire.
+- Les tests vérifient la conservation des reprises après redémarrage.
+
+Les migrations sont additives et ne modifient pas le schéma du Core
+ni celui de Ventes.
+
+### 2. Assemblage du module DGI
+
+Fichier ajouté : `vorpal/modules/dgi/module.py`.
+
+`DgiModule` :
+- reçoit explicitement le client fiscal et la table des groupes de taxes ;
+- applique les migrations DGI ;
+- construit le service de certification avec les dépôts SQL ;
+- souscrit réellement à `invoice.ready_for_certification` ;
+- expose `process_retries()` pour le traitement des reprises ;
+- fournit un contrôle de santé du module.
+
+Aucun client Mock n'est injecté implicitement en production.
+
+### 3. Reprise et réconciliation
+
+Le service DGI a été complété pour :
+- enregistrer l'état de la tentative dans l'outbox avant la soumission ;
+- traiter les erreurs réseau temporaires comme des reprises ;
+- consulter `get_status` pour réconcilier une tentative antérieure ;
+- récupérer un cachet complet lorsque la réponse initiale était
+  incomplète ;
+- réexaminer les entrées `SENT` lors du traitement de la file de reprise ;
+- retrouver les factures depuis l'outbox SQL ;
+- permettre la réouverture d'une entrée rejetée lorsqu'une nouvelle
+  demande horodatée est postérieure à la mise à jour précédente.
+
+La règle de conservation du numéro est pilotée par le paramètre
+`preserve_number_on_rejected_reopen` côté Ventes. Le scénario de
+resoumission avec conservation du numéro est couvert par un test
+d'intégration.
+
+### 4. Réouverture et resoumission côté Ventes
+
+Fichiers concernés :
+- `vorpal/modules/ventes/services/invoices.py`
+- `vorpal/modules/ventes/services/certification_results.py`
+- `vorpal/modules/dgi/event_handlers.py`
+- `vorpal/modules/dgi/service.py`
+
+Le service Ventes expose désormais `reopen_rejected()` :
+- vérification de permission ;
+- chargement de la facture persistée ;
+- réouverture d'une facture rejetée ;
+- conservation du numéro selon la configuration ;
+- possibilité de corriger les lignes ;
+- sauvegarde SQL et audit ;
+- émission des événements après commit.
+
+Le traitement des événements de rejet ignore une ancienne réponse
+lorsque la facture est déjà revenue à l'état DRAFT.
+
+**Limite connue :** une réponse de rejet ancienne reçue alors que la
+facture a déjà été revalidée (VALIDATED) peut encore nécessiter une
+protection supplémentaire. Une date de soumission persistée côté
+Ventes et une corrélation stricte des tentatives seraient nécessaires
+pour couvrir complètement ce cas.
+
+### 5. Tests ajoutés ou adaptés
+
+- `tests/dgi/test_persistence.py`
+- `tests/integration/test_ventes_dgi_resubmission.py`
+- adaptation de `tests/dgi/test_certification_integrity.py`
+
+Les scénarios couverts incluent notamment :
+- aller-retour de sérialisation des données ;
+- reprise après redémarrage ;
+- erreur réseau et réconciliation ;
+- récupération d'un cachet complet via `get_status` ;
+- intégrité du journal fiscal et détection d'altération ;
+- réouverture uniquement après une nouvelle demande ;
+- rejet, réouverture, correction et resoumission avec le même numéro ;
+- rejeu d'un ancien événement de rejet sur une facture rouverte.
+
+### 6. Résultats de validation — 21 novembre 2026
+
+Résultats communiqués après exécution dans l'environnement local :
+
+| Contrôle | Résultat |
+|---|---:|
+| Tests ciblés DGI + intégration | 53 passed |
+| Suite complète | 652 passed |
+| Ruff sur `vorpal/` | All checks passed |
+| Ruff sur les tests touchés | All checks passed |
+| Mypy | 107 fichiers source, aucune erreur |
+| Comparaison Core avec `core-v1` | Aucune différence |
+
+Une erreur Ruff d'organisation des imports dans
+`vorpal/modules/dgi/service.py` a été corrigée avec `ruff check --fix`.
+Le contrôle Ruff final sur `vorpal/` est propre.
+
+La commande suivante a confirmé que le Core n'a pas changé :
+
+`git diff --quiet core-v1 -- vorpal/core`
+
+Résultat : `CORE INCHANGE : aucune différence avec core-v1`.
+
+**Invariant confirmé : le Core V1 et le tag `core-v1` restent strictement
+inchangés.**
+
+### 7. État actualisé du circuit Ventes ↔ DGI
+
+Le circuit couvre maintenant :
+1. validation et enregistrement SQL de la facture dans Ventes ;
+2. émission de `invoice.ready_for_certification` après commit ;
+3. réception par le module DGI ;
+4. certification, rejet ou reprise ;
+5. persistance SQL de l'outbox et du journal DGI ;
+6. réconciliation des tentatives antérieures avec `get_status` ;
+7. émission du résultat fiscal ;
+8. mise à jour SQL de Ventes ;
+9. réouverture et resoumission après rejet ;
+10. conservation du numéro dans le scénario testé.
+
+Les résultats de tests démontrent le fonctionnement des scénarios
+simulés. Ils ne constituent pas une homologation officielle DGI ni une
+validation sur un dispositif fiscal réel.
+
+### 8. Limites et travaux encore ouverts
+
+Les éléments suivants ne doivent pas être considérés comme achevés :
+
+- **Planificateur de reprises :** `process_retries()` existe, mais
+  l'exécution automatique périodique n'est pas établie.
+- **Réponses de rejet obsolètes :** corrélation persistée des tentatives
+  à renforcer pour le cas où une facture est déjà VALIDATED.
+- **Concurrence SQL :** examiner les courses possibles lors de
+  l'insertion concurrente d'une même entrée d'outbox et lors de
+  l'attribution des séquences du journal fiscal.
+- **Réconciliation réseau :** vérifier que toute erreur de consultation
+  `get_status` empêche une nouvelle soumission potentiellement
+  duplicative.
+- **Mapping fiscal :** mapping interne A/E vers TG-* toujours à valider
+  officiellement ; ne pas inventer de correspondance.
+- **Avoirs :** workflow spécialisé `CreditNoteRequest`, motif obligatoire
+  et facture originale certifiée ; validation métier et fiscale encore
+  nécessaire.
+- **Compteurs fiscaux :** le modèle de cachet DGI ne fournit pas encore
+  tous les compteurs attendus.
+- **Document client :** les renderers ne sont pas encore raccordés à une
+  génération PDF fondée sur les données certifiées persistées.
+- **Homologation :** protocole officiel, client HTTP réel, signatures,
+  payloads et procédure d'homologation à confirmer.
+- **Autres intégrations :** Stocks et Trésorerie restent à traiter.
+
+Les paramètres fiscaux marqués `A_VALIDER` restent non officiels tant
+qu'ils ne sont pas confirmés par une source réglementaire ou une
+spécification DGI applicable.
+
+### 9. Prochaine étape recommandée
+
+Avant de déclarer le circuit prêt pour un environnement réel :
+
+1. auditer les cas de concurrence et de réconciliation réseau ;
+2. mettre en place un planificateur fiable des reprises ;
+3. renforcer la corrélation des tentatives Ventes/DGI ;
+4. valider les règles fiscales et les mappings avec les références
+   officielles ;
+5. finaliser le workflow des avoirs ;
+6. brancher la génération PDF sur les données certifiées persistées ;
+7. réaliser les tests avec un dispositif et un protocole autorisés.
+
+### 10. Règles de protection inchangées
+
+- Ne pas modifier `vorpal/core/` ni le tag `core-v1`.
+- Ne pas inclure `synchroniser_vorpal.py` dans les changements ou commits.
+- Préserver tous les fichiers `*.backup-*`.
+- Ne pas affaiblir les tests ni les contrôles Ruff/Mypy.
+- Ne pas effectuer de commit ou de push sans autorisation explicite.
+- Ne pas présenter les tests Mock comme une homologation officielle.
+
+**Fin de la mise à jour du lot 3.**

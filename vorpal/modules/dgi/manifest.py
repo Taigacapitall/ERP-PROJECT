@@ -24,9 +24,8 @@ DGI_PERMISSIONS: tuple[str, ...] = (
 DGI_MANIFEST = ModuleManifest(
     name="dgi",
     version="0.1.0",
-    description="Conformite fiscale DGI RDC (MCF / e-MCF, 12 mentions, avoirs, journal, homologation)",
-    dependencies=("core",),
-    permissions=DGI_PERMISSIONS,
-    events_listened=DGI_EVENTS_LISTENED,
-    events_emitted=DGI_EVENTS_EMITTED,
+    depends=[],
+    provides=[],
+    subscribes=list(DGI_EVENTS_LISTENED),
+    permissions=list(DGI_PERMISSIONS),
 )

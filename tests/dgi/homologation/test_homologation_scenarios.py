@@ -5,12 +5,12 @@ from __future__ import annotations
 from datetime import date, timedelta
 from decimal import Decimal
 
+from tests.dgi.conftest import make_valid_invoice
 from vorpal.core.money import Currency, Money
 from vorpal.modules.dgi.clients.mock import MockMCFClient
 from vorpal.modules.dgi.credit_note import CreditNoteRequest
 from vorpal.modules.dgi.models import CertificationStatus, InvoiceDTO, InvoiceLineDTO, PartyTaxInfo
 from vorpal.modules.dgi.service import CertificationService
-from tests.dgi.conftest import make_valid_invoice
 
 
 def test_homologation_scenario_multi_tax_and_out_of_scope(

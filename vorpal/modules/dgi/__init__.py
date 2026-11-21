@@ -4,7 +4,11 @@ from vorpal.modules.dgi.clients.base import DeviceResponse, FiscalDeviceClient
 from vorpal.modules.dgi.clients.http import HttpMCFClient, HttpMCFConfig
 from vorpal.modules.dgi.clients.mock import MockMCFClient
 from vorpal.modules.dgi.credit_note import CreditNoteRequest
-from vorpal.modules.dgi.errors_map import DEFAULT_DGI_ERROR_MAP, DgiErrorTranslation, DgiErrorTranslator
+from vorpal.modules.dgi.errors_map import (
+    DEFAULT_DGI_ERROR_MAP,
+    DgiErrorTranslation,
+    DgiErrorTranslator,
+)
 from vorpal.modules.dgi.journal import FiscalJournal, FiscalJournalEntry
 from vorpal.modules.dgi.manifest import (
     DGI_EVENTS_EMITTED,
@@ -27,18 +31,22 @@ from vorpal.modules.dgi.outbox import OutboxEntry, OutboxRepository
 from vorpal.modules.dgi.renderers import HtmlRenderer, InvoiceRenderer, TextRenderer
 from vorpal.modules.dgi.retry import RetryPolicy
 from vorpal.modules.dgi.service import CertificationService
-from vorpal.modules.dgi.state_machine import ensure_not_certified_immutable, transition_invoice_status
+from vorpal.modules.dgi.state_machine import (
+    ensure_not_certified_immutable,
+    transition_invoice_status,
+)
 from vorpal.modules.dgi.tax_groups import TaxGroup, TaxGroupTable, TaxMapping
 
 __all__ = [
-    "CertificationService",
-    "CertificationStatus",
-    "CreditNoteRequest",
     "DEFAULT_DGI_ERROR_MAP",
     "DGI_EVENTS_EMITTED",
     "DGI_EVENTS_LISTENED",
     "DGI_MANIFEST",
     "DGI_PERMISSIONS",
+    "MANDATORY_MENTIONS_KEYS",
+    "CertificationService",
+    "CertificationStatus",
+    "CreditNoteRequest",
     "DeviceResponse",
     "DgiErrorTranslation",
     "DgiErrorTranslator",
@@ -52,7 +60,6 @@ __all__ = [
     "InvoiceDTO",
     "InvoiceLineDTO",
     "InvoiceRenderer",
-    "MANDATORY_MENTIONS_KEYS",
     "MockMCFClient",
     "OutboxEntry",
     "OutboxRepository",

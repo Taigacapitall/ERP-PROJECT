@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from enum import Enum
 from typing import Literal
@@ -54,6 +54,21 @@ class FiscalStamp:
     certified_at: datetime
     # TODO(A_VALIDER): contenu exact des compteurs DGI (le Core impose un dictionnaire).
     counters: Mapping[str, str | int | Decimal] = field(default_factory=dict, hash=False)
+
+
+def _as_utc(value: datetime) -> datetime:
+    return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+
+
+def stamps_match(a: FiscalStamp, b: FiscalStamp) -> bool:
+    """Egalite de deux cachets (dates comparees en UTC ; SQLite perd le fuseau)."""
+    return (
+        a.device_id == b.device_id
+        and a.auth_code == b.auth_code
+        and a.qr_code == b.qr_code
+        and _as_utc(a.certified_at) == _as_utc(b.certified_at)
+        and dict(a.counters) == dict(b.counters)
+    )
 
 
 @dataclass(frozen=True)
@@ -310,12 +325,6 @@ class SalesInvoice:
 
     def mark_certified(self, certified_dto: CertifiedInvoiceDTO) -> SalesInvoice:
         """Applique la certification DGI de maniere idempotente."""
-        if self.status == InvoiceStatus.CERTIFIED:
-            return self
-        if self.status != InvoiceStatus.VALIDATED:
-            raise SalesConflictError(
-                f"Impossible de certifier une facture en etat {self.status.value}."
-            )
         stamp = FiscalStamp(
             device_id=certified_dto.device_id,
             auth_code=certified_dto.auth_code,
@@ -323,6 +332,17 @@ class SalesInvoice:
             certified_at=certified_dto.certified_at,
             counters=dict(certified_dto.counters),
         )
+        if self.status == InvoiceStatus.CERTIFIED:
+            if self.fiscal_stamp is not None and stamps_match(self.fiscal_stamp, stamp):
+                return self
+            raise SalesConflictError(
+                "Facture deja certifiee avec un cachet fiscal different : "
+                "le cachet enregistre ne peut pas etre ecrase."
+            )
+        if self.status != InvoiceStatus.VALIDATED:
+            raise SalesConflictError(
+                f"Impossible de certifier une facture en etat {self.status.value}."
+            )
         return replace(self, status=InvoiceStatus.CERTIFIED, fiscal_stamp=stamp, rejection_reason=None)
 
     def mark_rejected(self, reason: str) -> SalesInvoice:

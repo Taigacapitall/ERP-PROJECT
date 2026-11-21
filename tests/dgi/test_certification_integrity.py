@@ -1,0 +1,138 @@
+"""Cachet incomplet, reprises et idempotence du pipeline de certification DGI."""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime, timedelta
+
+import pytest
+
+from vorpal.core.events import Event, EventBus, InMemoryEventStore
+from vorpal.modules.dgi.clients.base import DeviceResponse, FiscalDeviceClient
+from vorpal.modules.dgi.journal import FiscalJournal
+from vorpal.modules.dgi.models import CertificationStatus, FiscalCertificationData, InvoiceDTO
+from vorpal.modules.dgi.outbox import OutboxRepository
+from vorpal.modules.dgi.retry import RetryPolicy
+from vorpal.modules.dgi.service import CertificationService
+from vorpal.modules.dgi.tax_groups import TaxGroupTable
+
+from .conftest import make_valid_invoice
+
+NOW = datetime(2026, 11, 20, 12, 0, 0, tzinfo=UTC)
+SERIAL = "SN-2026-00001"
+GOOD = FiscalCertificationData("MCF-01", "AUTH-1", "QR-1", "2026-11-20T12:00:00+00:00")
+
+
+def ok(cert: FiscalCertificationData | None = GOOD) -> DeviceResponse:
+    return DeviceResponse(accepted=True, status_hint="OK", certification=cert)
+
+
+class StubClient(FiscalDeviceClient):
+    def __init__(self, responses: list[DeviceResponse]) -> None:
+        self._responses = list(responses)
+        self.calls = 0
+
+    @property
+    def device_id(self) -> str:
+        return "STUB"
+
+    def submit(self, invoice: InvoiceDTO) -> DeviceResponse:
+        self.calls += 1
+        return self._responses.pop(0) if len(self._responses) > 1 else self._responses[0]
+
+    def get_status(self, invoice_serial_or_id: str) -> DeviceResponse:
+        return DeviceResponse(accepted=False, status_hint="PENDING")  # soumission inconnue du dispositif
+
+
+def build(responses: list[DeviceResponse], max_attempts: int = 5):
+    outbox = OutboxRepository()
+    bus = EventBus(store=InMemoryEventStore())
+    seen: dict[str, list[Event]] = {"invoice.certified": [], "invoice.rejected": []}
+    for name, bucket in seen.items():
+        bus.subscribe(name, bucket.append)
+    client = StubClient(responses)
+    service = CertificationService(
+        device_client=client,
+        tax_table=TaxGroupTable.from_json_file(),
+        outbox=outbox,
+        journal=FiscalJournal(),
+        event_bus=bus,
+        retry_policy=RetryPolicy(max_attempts=max_attempts, base_delay_seconds=10, max_delay_seconds=300),
+        clock=lambda: NOW,
+    )
+    return service, outbox, seen, client
+
+
+BAD_STAMPS = [
+    FiscalCertificationData("MCF-01", "AUTH-1", "QR-1", None),
+    FiscalCertificationData("MCF-01", "AUTH-1", "QR-1", ""),
+    FiscalCertificationData("MCF-01", "AUTH-1", "QR-1", "pas-une-date"),
+    FiscalCertificationData("MCF-01", "AUTH-1", "  ", "2026-11-20T12:00:00+00:00"),
+    FiscalCertificationData("  ", "AUTH-1", "QR-1", "2026-11-20T12:00:00+00:00"),
+    FiscalCertificationData("MCF-01", "", "QR-1", "2026-11-20T12:00:00+00:00"),
+]
+
+
+@pytest.mark.parametrize("bad", [*BAD_STAMPS, None])
+def test_incomplete_stamp_is_never_certified(bad):
+    service, outbox, seen, _ = build([ok(bad)])
+    inv = service.certify_invoice(make_valid_invoice())
+    assert inv.status == CertificationStatus.RETRY
+    assert inv.certification is None
+    assert seen["invoice.certified"] == []
+    entry = outbox.get(SERIAL)
+    assert entry is not None
+    assert entry.status == CertificationStatus.RETRY
+    assert entry.last_error_code == "INCOMPLETE_STAMP"
+
+
+def test_incomplete_stamp_after_max_attempts_is_rejected_not_certified():
+    service, _, seen, _ = build([ok(BAD_STAMPS[0])], max_attempts=1)
+    inv = service.certify_invoice(make_valid_invoice())
+    assert inv.status == CertificationStatus.REJECTED
+    assert seen["invoice.certified"] == []
+    assert len(seen["invoice.rejected"]) == 1
+
+
+def test_complete_stamp_certifies_and_event_carries_certified_at():
+    service, _, seen, _ = build([ok()])
+    inv = service.certify_invoice(make_valid_invoice())
+    assert inv.status == CertificationStatus.CERTIFIED
+    (event,) = seen["invoice.certified"]
+    assert event.payload["certified_at"] == GOOD.certified_at
+    assert event.payload["authentication_code"] == "AUTH-1"
+
+
+def test_retry_after_incomplete_stamp_then_certified_once():
+    service, _, seen, client = build([ok(BAD_STAMPS[0]), ok()])
+    assert service.certify_invoice(make_valid_invoice()).status == CertificationStatus.RETRY
+    done = service.process_retry_queue(NOW + timedelta(hours=1))
+    assert [d.status for d in done] == [CertificationStatus.CERTIFIED]
+    assert len(seen["invoice.certified"]) == 1
+    assert service.process_retry_queue(NOW + timedelta(hours=2)) == []
+    assert client.calls == 2
+
+
+def test_temporary_unavailability_keeps_retry_then_final_rejection_is_published():
+    down = DeviceResponse(accepted=False, status_hint="RETRY", error_code="DEVICE_DOWN")
+    refused = DeviceResponse(accepted=False, status_hint="REJECT", error_code="REFUSED", error_message="non")
+    service, outbox, seen, _ = build([down, refused])
+    assert service.certify_invoice(make_valid_invoice()).status == CertificationStatus.RETRY
+    assert seen["invoice.certified"] == [] and seen["invoice.rejected"] == []
+    service.process_retry_queue(NOW + timedelta(hours=1))
+    entry = outbox.get(SERIAL)
+    assert entry is not None and entry.status == CertificationStatus.REJECTED
+    assert len(seen["invoice.rejected"]) == 1
+
+
+def test_certified_serial_cannot_lend_its_stamp_to_a_different_invoice():
+    from decimal import Decimal
+
+    from vorpal.core.errors import ComplianceError
+    from vorpal.core.money import Currency, Money
+
+    service, _, _, _ = build([ok()])
+    service.certify_invoice(make_valid_invoice())
+    other = make_valid_invoice()
+    other.total_ttc = Money(Decimal("999.00"), Currency.USD)
+    with pytest.raises(ComplianceError):
+        service.certify_invoice(other)

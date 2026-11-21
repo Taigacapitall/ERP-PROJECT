@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
@@ -21,7 +21,7 @@ from vorpal.modules.dgi.tax_groups import TaxGroupTable
 
 @pytest.fixture
 def dgi_clock() -> datetime:
-    return datetime(2026, 11, 20, 12, 0, 0, tzinfo=timezone.utc)
+    return datetime(2026, 11, 20, 12, 0, 0, tzinfo=UTC)
 
 
 @pytest.fixture

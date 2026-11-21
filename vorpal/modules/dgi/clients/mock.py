@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from vorpal.modules.dgi.clients.base import DeviceResponse, FiscalDeviceClient
 from vorpal.modules.dgi.models import FiscalCertificationData, InvoiceDTO
@@ -70,12 +70,12 @@ class MockMCFClient(FiscalDeviceClient):
             return self._submitted_by_key[invoice.serial_number]
 
         digest = hashlib.sha256(
-            f"{self._device_id}:{invoice.serial_number}:{invoice.total_ttc.amount}".encode("utf-8")
+            f"{self._device_id}:{invoice.serial_number}:{invoice.total_ttc.amount}".encode()
         ).hexdigest().upper()
         auth_code = f"AUTH-{digest[:12]}"
         qr_payload = f"DGI-RDC|DEV={self._device_id}|SN={invoice.serial_number}|TTC={invoice.total_ttc.amount}|AUTH={auth_code}"
         certified_at = (
-            self.clock().isoformat() if self.clock is not None else datetime.now(timezone.utc).isoformat()
+            self.clock().isoformat() if self.clock is not None else datetime.now(UTC).isoformat()
         )
 
         cert = FiscalCertificationData(
