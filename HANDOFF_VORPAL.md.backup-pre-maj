@@ -1,0 +1,54 @@
+# HANDOFF_VORPAL — Circuit Ventes → DGI → Ventes
+
+Complète `HANDOFF.md` (non modifié). Branche : `feat/ventes-dgi-circuit`. Aucun commit n'a été créé.
+
+## 1. Architecture réelle
+1. `InvoiceService.validate_and_submit` (Ventes) valide, numérote (séquence SQL) et enregistre la facture en SQL.
+2. Après commit, `PostCommitBatch` appelle `EventBusSalesPublisher`, qui publie `invoice.ready_for_certification`. Le payload porte l'`InvoiceDTO` Core sérialisé (`{"invoice": ...}`).
+3. `DgiModule.start()` souscrit `InvoiceReadyForCertificationHandler`. Ce handler convertit (via `map_internal_tax`), puis appelle `certify_invoice()`.
+4. DGI publie `invoice.certified` (avec `certified_at`) ou `invoice.rejected`.
+5. `VentesModule.start()` souscrit `CertificationResultHandlers`. Ils retrouvent la facture par numéro, appliquent `mark_certified` / `mark_rejected` et enregistrent en transaction SQL.
+6. Au rechargement, le mapper refuse toute facture CERTIFIED sans cachet complet.
+
+Les deux modules ont `depends=[]` : ils ne communiquent que par événements. Le Core et le tag `core-v1` sont inchangés (vérifié par `git diff core-v1 -- vorpal/core`).
+
+## 2. Fichiers
+**Créés** : `dgi/event_handlers.py`, `dgi/module.py`, `ventes/adapters/events.py`, `ventes/manifest.py`, `ventes/module.py`, `ventes/services/invoices.py`, `ventes/services/certification_results.py`, `tests/dgi/test_certification_integrity.py`, `tests/dgi/test_event_wiring.py`, `tests/ventes/domain/test_certified_stamp_conflict.py`, `tests/integration/` (`__init__.py`, `test_ventes_dgi_circuit.py`).
+**Modifiés** : `dgi/service.py`, `ventes/domain/invoices.py`, `ventes/adapters/persistence/mappers.py`, `tests/ventes/domain/test_invoices_payments_reminders.py` (un seul test adapté, voir §3.2).
+Des modifications locales antérieures à ce travail existent aussi (`dgi/__init__.py`, `dgi/manifest.py`, `dgi/clients/mock.py`, tests DGI). Les fichiers `*.backup-*` et `synchroniser_vorpal.py` ne doivent PAS être commités.
+
+## 3. Problèmes corrigés
+1. **Certification prématurée** : le cachet est vérifié (4 champs + `certified_at` ISO valide) AVANT toute transition CERTIFIED. Un cachet incomplet passe en RETRY avec le code `INCOMPLETE_STAMP`, puis en REJECTED si les tentatives sont épuisées. `invoice.certified` n'est jamais publié dans ce cas.
+2. **Idempotence** : `mark_certified` renvoie la facture si le cachet est identique (dates comparées en UTC), et lève `SalesConflictError` si le cachet diffère. Le test `test_mark_certified_is_idempotent` passait `None` ; il rejoue maintenant le même cachet. Côté DGI, un numéro de série déjà certifié refuse d'hériter du cachet si le TTC ou la date diffère.
+3. **Raccordement** : publisher, `module.py` des deux modules, souscriptions dans `start()`.
+4. **Rechargement SQL** : erreur explicite pour CERTIFIED sans cachet complet, et pour un cachet partiel. Schéma SQL inchangé.
+5. **Reprises** : l'indisponibilité temporaire garde RETRY ; certification ou rejet après reprise passe par le même circuit et atteint Ventes.
+6. **Taxes** : `certify()` et le handler utilisent `map_internal_tax`. Aucune correspondance A/E → TG-* n'est écrite en dur. Sans correspondance, DGI refuse (`NOT_TRANSMITTABLE`) et Ventes passe REJECTED avec un motif clair.
+
+## 4. Tests
+Suite complète : **644 passés, 0 échec** (base : 612). Mypy strict sur `vorpal` : OK (106 fichiers). Ruff : voir le rapport final ; la base avait 34 erreurs préexistantes dans `tests/ventes/services/`, non touchées.
+Les tests utilisent SQLite en mémoire et `MockMCFClient` avec une table fiscale de test déclarée explicitement. **Ce n'est pas une homologation DGI.**
+
+## 5. Limites restantes
+- **Outbox et journal DGI en mémoire** : un redémarrage perd les reprises en attente. Aucun planificateur n'appelle `DgiModule.process_retries()`.
+- **Crash pendant la soumission** : si le client fiscal lève une exception réseau, l'entrée reste en SENT et n'est pas reprise. Il faudrait un `get_status` avant toute resoumission.
+- **Rejet après cachet incomplet** : une facture peut avoir été certifiée par le dispositif sans que la réponse soit exploitable. Il faudrait interroger `get_status` avant de rejeter.
+- **Resoumission après rejet** : le handler DGI ignore un numéro déjà connu de l'outbox. Une facture rejetée puis rouverte (`reopen_after_rejection`) n'est donc pas encore resoumettable sous le même numéro, et `InvoiceService` n'expose pas la réouverture. Dépend de la règle A_VALIDER sur le numéro après rejet.
+- **Mapping A/E → TG-*** absent de la configuration de production : toute certification réelle sera refusée tant qu'il n'est pas déclaré et validé.
+- **Compteurs fiscaux** : `counters={}` (limite du modèle DGI).
+- **Avoirs** : hors de `InvoiceService` (workflow spécialisé requis).
+- **`payment.received`** : payload provisoire (A_VALIDER).
+- **Document client** : seul le contrôle de `to_invoice_dto` sur facture certifiée est testé ; les renderers DGI ne sont pas branchés.
+
+## 6. Décisions d'architecture
+- Le payload porte le DTO Core complet, pour que DGI ne lise jamais la base de Ventes.
+- La conversion Core → DGI est extraite dans `convert_core_invoice`, partagée par `certify()` et le handler.
+- Le client fiscal et la table de taxes sont injectés explicitement dans `DgiModule` (jamais de Mock implicite).
+- Un handler en erreur est rejoué par l'EventBus ; tous les handlers sont idempotents.
+
+## 7. Prochaines étapes
+1. Persistance SQL de l'outbox et du journal DGI, avec migrations.
+2. Planificateur de reprises et `get_status` avant resoumission ou rejet.
+3. Service de réouverture et resoumission des factures rejetées.
+4. Validation fiscale : mapping A/E, numérotation, arrondis, compteurs, homologation officielle.
+5. Brancher les renderers DGI pour produire le document client.

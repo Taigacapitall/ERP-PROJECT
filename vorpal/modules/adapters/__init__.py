@@ -1,0 +1,1 @@
+"""Adaptateurs vers systèmes externes."""

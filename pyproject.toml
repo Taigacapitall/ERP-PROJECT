@@ -46,4 +46,7 @@ python_version = "3.11"
 strict = true
 
 [tool.setuptools.package-data]
+"vorpal.modules.dgi" = ["data/*.json"]
+"vorpal.modules.achats" = ["data/*.json"]
+"vorpal.modules.adapters.odoo" = ["data/*.json"]
 "vorpal.modules.ventes" = ["data/*.json"]

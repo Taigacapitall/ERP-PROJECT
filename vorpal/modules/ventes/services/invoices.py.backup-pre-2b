@@ -1,0 +1,84 @@
+"""Cycle de vie des factures de vente : brouillon, validation, soumission a la certification."""
+
+from __future__ import annotations
+
+from datetime import date
+
+from vorpal.core import Currency, User
+from vorpal.modules.ventes.domain.errors import SalesComplianceError, SalesValidationError
+from vorpal.modules.ventes.domain.invoices import InvoiceLine, SalesInvoice
+from vorpal.modules.ventes.services.common import ApplicationService, PostCommitBatch
+
+PERM_INVOICE_CREATE = "ventes.invoice.create"
+PERM_INVOICE_VALIDATE = "ventes.invoice.validate"
+
+
+class InvoiceService(ApplicationService):
+    """Les avoirs relevent d'un workflow specialise (facture d'origine certifiee) : hors de ce service."""
+
+    def create_draft(
+        self,
+        actor: User,
+        *,
+        customer_id: str,
+        due_date: date,
+        lines: tuple[InvoiceLine, ...],
+        currency: Currency | None = None,
+        invoice_date: date | None = None,
+        order_id: str | None = None,
+    ) -> SalesInvoice:
+        self._require(actor, PERM_INVOICE_CREATE)
+        batch = PostCommitBatch()
+        with self._deps.uow_factory() as uow:
+            if uow.customers.get(customer_id) is None:
+                raise SalesValidationError(f"Client '{customer_id}' introuvable.")
+            invoice = SalesInvoice(
+                id=self._deps.id_factory(),
+                customer_id=customer_id,
+                invoice_date=invoice_date or self._today(),
+                due_date=due_date,
+                currency=currency or self._deps.settings.default_currency,
+                lines=lines,
+                order_id=order_id,
+            )
+            uow.invoices.save(invoice)
+            batch.add_audit(
+                user=actor.username, action="INVOICE_CREATED", entity="sales_invoice",
+                entity_id=invoice.id, after={"status": invoice.status.value},
+            )
+            uow.commit()
+        batch.emit(self._deps)
+        return invoice
+
+    def validate_and_submit(self, actor: User, invoice_id: str) -> SalesInvoice:
+        """Valide, numerote, enregistre en SQL puis publie `invoice.ready_for_certification` APRES commit."""
+        self._require(actor, PERM_INVOICE_VALIDATE)
+        batch = PostCommitBatch()
+        with self._deps.uow_factory() as uow:
+            invoice = uow.invoices.get(invoice_id)
+            if invoice is None:
+                raise SalesValidationError(f"Facture '{invoice_id}' introuvable.")
+            if invoice.invoice_type != "vente":
+                raise SalesComplianceError(
+                    "Les avoirs ne passent pas par ce service (facture d'origine certifiee requise)."
+                )
+            customer = uow.customers.get(invoice.customer_id)
+            if customer is None:
+                raise SalesValidationError(f"Client '{invoice.customer_id}' introuvable.")
+            decimals = self._decimals(invoice.currency)
+            # Un numero deja attribue (facture rouverte) est conserve : on ne consomme pas la sequence.
+            number = invoice.number or uow.numbers.next_number("invoice", invoice.invoice_date.year)
+            validated = invoice.validate(customer=customer, assigned_number=number, decimals=decimals)
+            uow.invoices.save(validated)
+            batch.ready_invoices.append(
+                validated.to_invoice_dto(customer, self._deps.settings.seller, decimals=decimals)
+            )
+            batch.add_audit(
+                user=actor.username, action="INVOICE_VALIDATED", entity="sales_invoice",
+                entity_id=validated.id,
+                before={"status": invoice.status.value},
+                after={"status": validated.status.value, "number": validated.number},
+            )
+            uow.commit()
+        batch.emit(self._deps)
+        return validated
