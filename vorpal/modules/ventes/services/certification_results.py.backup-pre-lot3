@@ -1,0 +1,92 @@
+"""Handlers Ventes des resultats DGI (`invoice.certified`, `invoice.rejected`)."""
+
+from __future__ import annotations
+
+from collections.abc import Mapping
+from datetime import datetime
+
+from vorpal.core.contracts import CertifiedInvoiceDTO
+from vorpal.core.events import Event
+from vorpal.modules.ventes.domain.errors import SalesValidationError
+from vorpal.modules.ventes.services.common import PostCommitBatch, ServiceDependencies
+
+SYSTEM_USER = "system.ventes"
+
+
+def _text(payload: Mapping[str, object], key: str) -> str:
+    value = payload.get(key)
+    if not isinstance(value, str) or not value.strip():
+        raise SalesValidationError(f"Evenement DGI invalide : champ '{key}' absent ou vide.")
+    return value
+
+
+class CertificationResultHandlers:
+    """Applique les resultats fiscaux sur la facture SQL. Idempotent ; une erreur = handler rejoue par le bus."""
+
+    def __init__(self, deps: ServiceDependencies) -> None:
+        self._deps = deps
+
+    def on_certified(self, event: Event) -> None:
+        number = _text(event.payload, "serial_number")
+        device_id = _text(event.payload, "fiscal_device_id")
+        auth_code = _text(event.payload, "authentication_code")
+        qr_code = _text(event.payload, "qr_code")
+        try:
+            certified_at = datetime.fromisoformat(_text(event.payload, "certified_at"))
+        except ValueError as exc:
+            raise SalesValidationError("Evenement DGI invalide : 'certified_at' illisible.") from exc
+
+        batch = PostCommitBatch()
+        with self._deps.uow_factory() as uow:
+            invoice = uow.invoices.get_by_number(number)
+            if invoice is None:
+                raise SalesValidationError(f"Facture '{number}' introuvable pour le resultat DGI.")
+            customer = uow.customers.get(invoice.customer_id)
+            if customer is None:
+                raise SalesValidationError(f"Client '{invoice.customer_id}' introuvable.")
+            dto = invoice.to_invoice_dto(
+                customer,
+                self._deps.settings.seller,
+                decimals=self._deps.settings.rounding.decimals_for(invoice.currency),
+            )
+            certified_dto = CertifiedInvoiceDTO(
+                **dto.model_dump(),
+                device_id=device_id,
+                auth_code=auth_code,
+                qr_code=qr_code,
+                certified_at=certified_at,
+                counters={},  # TODO(A_VALIDER): compteurs fiscaux DGI non fournis par le modele DGI actuel.
+            )
+            updated = invoice.mark_certified(certified_dto)  # leve SalesConflictError si cachet different
+            if updated is not invoice:
+                uow.invoices.save(updated)
+                batch.add_audit(
+                    user=SYSTEM_USER, action="INVOICE_CERTIFIED", entity="sales_invoice",
+                    entity_id=invoice.id,
+                    before={"status": invoice.status.value},
+                    after={"status": updated.status.value, "auth_code": auth_code},
+                )
+                uow.commit()
+        batch.emit(self._deps)
+
+    def on_rejected(self, event: Event) -> None:
+        number = _text(event.payload, "serial_number")
+        raw_reason = event.payload.get("reason")
+        reason = raw_reason if isinstance(raw_reason, str) else ""
+
+        batch = PostCommitBatch()
+        with self._deps.uow_factory() as uow:
+            invoice = uow.invoices.get_by_number(number)
+            if invoice is None:
+                raise SalesValidationError(f"Facture '{number}' introuvable pour le rejet DGI.")
+            updated = invoice.mark_rejected(reason)  # refuse de rejeter une facture CERTIFIED
+            if updated is not invoice:
+                uow.invoices.save(updated)
+                batch.add_audit(
+                    user=SYSTEM_USER, action="INVOICE_REJECTED", entity="sales_invoice",
+                    entity_id=invoice.id,
+                    before={"status": invoice.status.value},
+                    after={"status": updated.status.value, "reason": updated.rejection_reason},
+                )
+                uow.commit()
+        batch.emit(self._deps)

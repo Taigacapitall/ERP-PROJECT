@@ -1,0 +1,49 @@
+"""Handlers EventBus du module DGI (reception des factures a certifier)."""
+
+from __future__ import annotations
+
+from collections.abc import Mapping
+
+from pydantic import ValidationError as PydanticValidationError
+
+from vorpal.core.contracts import InvoiceDTO as CoreInvoiceDTO
+from vorpal.core.errors import ComplianceError
+from vorpal.core.events import Event
+from vorpal.modules.dgi.models import CertificationStatus
+from vorpal.modules.dgi.service import CertificationService
+
+
+class InvoiceReadyForCertificationHandler:
+    """Traite `invoice.ready_for_certification` : idempotent, rejoue sans double soumission."""
+
+    def __init__(self, service: CertificationService) -> None:
+        self._service = service
+        self.enabled = True
+
+    def __call__(self, event: Event) -> None:
+        if not self.enabled:
+            return
+        raw = event.payload.get("invoice")
+        if not isinstance(raw, Mapping):
+            raise ComplianceError("Evenement invalide : le payload doit contenir 'invoice'.")
+        try:
+            core_invoice = CoreInvoiceDTO.model_validate(raw)
+        except PydanticValidationError as exc:
+            raise ComplianceError(f"Facture du payload invalide : {exc.error_count()} erreur(s).") from exc
+
+        number = core_invoice.number
+        if self._service.certification_status(number) is not None:
+            return  # deja pris en charge : la file de reprise est seule responsable des reprises
+
+        try:
+            dgi_invoice = self._service.convert_core_invoice(core_invoice)
+        except ComplianceError as exc:
+            self._service.refuse_invoice(number, str(exc))
+            return
+
+        try:
+            self._service.certify_invoice(dgi_invoice)
+        except ComplianceError:
+            # Un rejet de validation est deja journalise et publie par certify_invoice.
+            if self._service.certification_status(number) != CertificationStatus.REJECTED:
+                raise

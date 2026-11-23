@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "status": "A_VALIDER",
+  "note": "Comptes et journaux par défaut. A valider par un comptable OHADA RDC avant production. Un code court (ex. 4111) est résolu par préfixe si le plan est généré sur 6 chiffres. Le InvoiceLineDTO du Core ne porte pas de nature de ligne : un seul compte de produit (revenue.default). MOBILE_MONEY est routé vers les journaux banque (décision provisoire, A_VALIDER). La devise de paie (PayrollResultDTO sans devise) est fixée ici (A_VALIDER).",
+  "events": {
+    "invoice.certified": {
+      "journal": "VTE",
+      "receivable": "4111",
+      "revenue": {
+        "default": "7011"
+      },
+      "vat_collected": "4431"
+    },
+    "credit_note.certified": {
+      "journal": "VTE",
+      "receivable": "4111",
+      "revenue": {
+        "default": "7011"
+      },
+      "vat_collected": "4431"
+    },
+    "payment.received": {
+      "receivable": "4111",
+      "routes": {
+        "CASH:USD": "CAU",
+        "CASH:CDF": "CAF",
+        "BANK_TRANSFER:USD": "BQU",
+        "BANK_TRANSFER:CDF": "BQF",
+        "MOBILE_MONEY:USD": "BQU",
+        "MOBILE_MONEY:CDF": "BQF"
+      }
+    },
+    "payroll.validated": {
+      "journal": "PAIE",
+      "gross_salary_expense": "6611",
+      "employer_social_expense": "6641",
+      "net_pay_due": "422",
+      "social_security_due": "4313",
+      "income_tax_due": "4472",
+      "currency": "USD"
+    }
+  }
+}
