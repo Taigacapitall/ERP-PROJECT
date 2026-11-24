@@ -18,8 +18,14 @@ from vorpal.modules.ventes.adapters.persistence.unit_of_work import SqlSalesUnit
 from vorpal.modules.ventes.manifest import VENTES_MANIFEST
 from vorpal.modules.ventes.ports.unit_of_work import SalesUnitOfWork
 from vorpal.modules.ventes.services.certification_results import CertificationResultHandlers
+from vorpal.modules.ventes.services.classic_invoicing import ClassicInvoicingService
 from vorpal.modules.ventes.services.common import ServiceDependencies
+from vorpal.modules.ventes.services.customers import CustomerService
+from vorpal.modules.ventes.services.invoice_queries import InvoiceQueryService
 from vorpal.modules.ventes.services.invoices import InvoiceService
+from vorpal.modules.ventes.services.orders import OrderService
+from vorpal.modules.ventes.services.pricing import PricingService
+from vorpal.modules.ventes.services.quotes import QuoteService
 from vorpal.modules.ventes.settings import SalesSettings
 
 
@@ -39,6 +45,13 @@ class VentesModule(BaseModule):
         self._session_factory: sessionmaker[Session] | None = None
         self.uow_factory: Callable[[], SalesUnitOfWork] | None = None
         self.invoice_service: InvoiceService | None = None
+        self.customer_service: CustomerService | None = None
+        self.pricing_service: PricingService | None = None
+        self.quote_service: QuoteService | None = None
+        self.order_service: OrderService | None = None
+        self.classic_service: ClassicInvoicingService | None = None
+        self.query_service: InvoiceQueryService | None = None
+        self.settings: SalesSettings | None = None
         self.result_handlers: CertificationResultHandlers | None = None
 
     def install(self, ctx: AppContext) -> None:
@@ -72,10 +85,25 @@ class VentesModule(BaseModule):
         ctx.event_bus.subscribe(INVOICE_REJECTED, handlers.on_rejected)
         self.uow_factory = uow_factory
         self.invoice_service = InvoiceService(deps)
+        pricing = PricingService(deps, ctx.services)
+        self.pricing_service = pricing
+        self.customer_service = CustomerService(deps)
+        self.quote_service = QuoteService(deps, pricing)
+        self.order_service = OrderService(deps, pricing)
+        self.classic_service = ClassicInvoicingService(deps)
+        self.query_service = InvoiceQueryService(deps)
+        self.settings = settings
         self.result_handlers = handlers
 
     def stop(self) -> None:
         self.invoice_service = None
+        self.customer_service = None
+        self.pricing_service = None
+        self.quote_service = None
+        self.order_service = None
+        self.classic_service = None
+        self.query_service = None
+        self.settings = None
         self.result_handlers = None
         self.uow_factory = None
 

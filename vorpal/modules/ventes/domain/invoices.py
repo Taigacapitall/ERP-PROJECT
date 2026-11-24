@@ -237,6 +237,7 @@ class SalesInvoice:
         tax_id_validator: TaxIdValidator | None = None,
         original_invoice: SalesInvoice | None = None,
         already_credited_ttc: Money | None = None,
+        allow_uncertified_original: bool = False,
     ) -> SalesInvoice:
         """Valide la facture, fige les lignes et totaux, et attribue le numero officiel."""
         if self.status != InvoiceStatus.DRAFT:
@@ -257,7 +258,9 @@ class SalesInvoice:
                 raise SalesValidationError("La facture d'origine est requise pour valider un avoir.")
             if original_invoice.invoice_type != "vente":
                 raise SalesComplianceError("Un avoir ne peut porter que sur une facture de vente.")
-            if original_invoice.status != InvoiceStatus.CERTIFIED:
+            certified = original_invoice.status == InvoiceStatus.CERTIFIED
+            classic_ok = allow_uncertified_original and original_invoice.status == InvoiceStatus.VALIDATED
+            if not (certified or classic_ok):
                 raise SalesComplianceError("Un avoir ne peut etre emis que sur une facture d'origine CERTIFIED.")
             if original_invoice.currency != self.currency:
                 raise SalesValidationError("La devise de l'avoir doit correspondre a celle de la facture d'origine.")

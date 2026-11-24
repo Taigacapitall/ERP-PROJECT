@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from vorpal.modules.ventes.adapters.persistence.models import NumberSequenceModel
@@ -48,25 +49,36 @@ class SqlNumberSequence(NumberSequence):
         self._numbering = numbering_settings
 
     def next_number(self, sequence_key: str, fiscal_year: int) -> str:
+        """Alloue le numero suivant par UPDATE atomique (verrou de ligne tenu jusqu'au commit).
+
+        Pas de lecture-puis-ecriture : deux transactions concurrentes ne peuvent pas obtenir le meme numero.
+        Premiere allocation d'une sequence : insertion sous SAVEPOINT, puis nouvel essai si une autre
+        transaction a cree la ligne entre-temps.
+        """
         cfg = get_sequence_config(self._numbering, sequence_key)
-        stmt = select(NumberSequenceModel).where(
+        same_sequence = (
             NumberSequenceModel.sequence_key == sequence_key,
             NumberSequenceModel.fiscal_year == fiscal_year,
         )
-        row = self._session.scalars(stmt).first()
-        if row is None:
-            next_val = 1
-            row = NumberSequenceModel(
-                sequence_key=sequence_key,
-                fiscal_year=fiscal_year,
-                last_value=next_val,
-            )
-            self._session.add(row)
-        else:
-            next_val = row.last_value + 1
-            row.last_value = next_val
-        self._session.flush()
-        return format_document_number(cfg, fiscal_year, next_val)
+        for _ in range(5):
+            value = self._session.execute(
+                update(NumberSequenceModel)
+                .where(*same_sequence)
+                .values(last_value=NumberSequenceModel.last_value + 1)
+                .returning(NumberSequenceModel.last_value)
+            ).scalar_one_or_none()
+            if value is not None:
+                return format_document_number(cfg, fiscal_year, int(value))
+            try:
+                with self._session.begin_nested():
+                    self._session.add(
+                        NumberSequenceModel(sequence_key=sequence_key, fiscal_year=fiscal_year, last_value=1)
+                    )
+                    self._session.flush()
+            except IntegrityError:
+                continue
+            return format_document_number(cfg, fiscal_year, 1)
+        raise SalesValidationError("Impossible d'allouer un numero : sequence trop sollicitee, reessayez.")
 
 
 class InMemoryNumberSequence(NumberSequence):
