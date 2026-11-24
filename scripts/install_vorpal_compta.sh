@@ -15,4 +15,4 @@ while IFS= read -r -d '' f; do
   echo "COPIE : $rel"
   if [ "$DRY" != "--dry-run" ]; then mkdir -p "$(dirname "$DEST/$rel")"; cp "$f" "$DEST/$rel"; fi
 done < <(find vorpal odoo_addons tests docs -type f -print0)
-echo "Terminé. Aucun commit/push effectué. HANDOFF.md non modifié : ajoutez docs/HANDOFF_SECTION_COMPTA.md à la main."
+echo "Terminé. Aucun commit/push effectué. Voir docs/COMPTABILITE.md pour l'état de la comptabilité."

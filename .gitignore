@@ -22,3 +22,11 @@ htmlcov/
 .vscode/
 .idea/
 .DS_Store
+
+# Sauvegardes et fichiers temporaires (ne jamais versionner)
+*.backup*
+*.bak
+*.orig
+_backups*/
+_sauvegardes_*/
+rapport_depot.txt

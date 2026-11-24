@@ -409,7 +409,7 @@ python -m ruff check vorpal
 python -m mypy vorpal
 ```
 
-Avant toute modification : 1. lire `HANDOFF.md` ; 2. lire
+Avant toute modification : 1. lire `HANDOFF.md` (document unique de reprise) ; 2. lire
 `docs/CORE_DOCUMENTATION.md` pour les règles du Core ; 3. lire ce
 document pour le module Ventes ; 4. examiner `git status` et les
 différences existantes ; 5. identifier les fichiers autorisés à changer
@@ -421,6 +421,27 @@ validations ciblées puis globales.
 Ne pas modifier le Core, les contrats protégés ou la configuration
 globale sans autorisation explicite. Ne pas faire de commit ou de push
 sans autorisation explicite.
+
+## 16. Facturation commerciale classique (sans DGI) — lot 1, 24 novembre 2026
+
+Cette section complète le module sans modifier les services DGI existants (`InvoiceService.validate_and_submit` reste le chemin « certification »).
+
+**Services** (exposés par `VentesModule`) : `classic_service` (`ClassicInvoicingService`), `query_service` (`InvoiceQueryService`), fonctions de `services/documents.py`.
+
+| Besoin | Méthode |
+|---|---|
+| Facture depuis une commande confirmée (totale ou partielle) | `invoice_from_order` |
+| Émettre (numéroter, figer, sans événement DGI) | `issue_invoice` |
+| Encaisser, lettrer, acomptes, annuler un paiement | `record_payment`, `allocate_payment`, `cancel_payment` |
+| Avoir total ou partiel / annuler une facture | `credit_invoice`, `cancel_invoice` |
+| Consulter, impayés échus, relevé client | `get_invoice`, `list_invoices`, `list_overdue`, `customer_statement` |
+| PDF et CSV | `invoice_model` + `render_pdf`, `quote_model`, `export_invoices_csv` |
+
+**Règles** : en mode classique, `VALIDATED` signifie « Émise » ; une facture entièrement créditée est « Annulée » (calcul, pas de statut stocké) ; le solde net est TTC − avoirs − encaissements ; un client sans NIF est accepté ; les PDF portent la mention « non certifié par la DGI ». Permissions : `ventes.confirm` (émission), `ventes.create` (facture depuis commande, paiement), `ventes.admin` (avoir, annulation, annulation de paiement), `ventes.view` (lecture).
+
+**Modifications associées** : `domain/invoices.py` — paramètre `allow_uncertified_original` (défaut `False`) de `SalesInvoice.validate`, qui permet un avoir sur une facture émise non certifiée ; `adapters/persistence/numbering.py` — allocation atomique des numéros (`UPDATE … RETURNING`).
+
+**Limites** : pas de remboursement client en cas de solde net négatif ; motif d'avoir conservé uniquement dans le journal d'audit ; règles d'arrondi et de numérotation toujours `A_VALIDER`.
 
 ------------------------------------------------------------------------
 
