@@ -136,6 +136,7 @@ class ClassicInvoicingService(ApplicationService):
                 tax_id_validator=AcceptAnyTaxId(),
             )
             uow.invoices.save(issued)
+            batch.issued_invoices.append((issued, customer))
             batch.add_audit(
                 user=actor.username, action="INVOICE_ISSUED", entity="sales_invoice", entity_id=issued.id,
                 before={"status": invoice.status.value},
@@ -221,6 +222,7 @@ class ClassicInvoicingService(ApplicationService):
             uow.payments.save(cancelled)
             for invoice_id in {alloc.invoice_id for alloc in released}:
                 self._sync_paid(uow, invoice_id)
+            batch.cancelled_payments.append(cancelled)
             batch.add_audit(
                 user=actor.username, action="PAYMENT_CANCELLED", entity="sales_payment", entity_id=payment_id,
                 before={"status": PaymentStatus.RECORDED.value}, after={"status": cancelled.status.value},
@@ -338,6 +340,7 @@ class ClassicInvoicingService(ApplicationService):
             allow_uncertified_original=True,
         )
         uow.invoices.save(note)
+        batch.issued_credit_notes.append((note, customer))
         batch.add_audit(
             user=actor.username, action="CREDIT_NOTE_ISSUED", entity="sales_invoice", entity_id=note.id,
             after={"number": note.number, "original": original.number, "reason": reason.strip(),

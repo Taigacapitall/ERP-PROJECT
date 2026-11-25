@@ -13,11 +13,24 @@ Produit unique, sans Odoo : `vorpal/modules/comptabilite/` (tables `compta_*`, m
 - **Plan** : `data/plan_syscohada_base.json` (154 comptes, niveaux 2 à 4 chiffres, **A_VALIDER**). Plan complet : `ChartService.import_csv(<account.account-syscohada.csv d'Odoo>)`.
 - **Tests** : `tests/comptabilite/` (43), SQLite mémoire et base fichier avec redémarrage ; scénario chiffré à la main (résultat 1 500, bilan 12 300 / 12 300).
 
+### Écritures automatiques (événements)
+`events.py` + `mapping.py` + `data/account_mapping.json` (**A_VALIDER**). Idempotence portée par le grand livre (`source_ref` = « <événement>:<numéro> ») ; un handler en erreur est réessayé par `EventBus.replay()` (test : exercice manquant, puis création, puis rejeu).
+| Événement | Producteur | Écriture |
+|---|---|---|
+| `invoice.certified` / `credit_note.certified` | DGI (payload enrichi : montants, client, date) | Client 4111 / produit 7011 / TVA 4431, **uniquement avec cachet complet** ; `dgi_code` et `dgi_qr` conservés sur l'écriture |
+| `ventes.invoice.issued` / `ventes.credit_note.issued` | Ventes (facturation classique, sans DGI) | idem, sans cachet ; avoir = sens inverse |
+| `payment.received` | Ventes | Compte de trésorerie du journal (route méthode:devise) / 4111 ; CDF converti au taux du fournisseur de taux injecté |
+| `ventes.payment.cancelled` | Ventes | Extourne de l'écriture de l'encaissement |
+Ces trois derniers événements Ventes sont nouveaux (publisher : méthodes concrètes, les doubles de test existants restent valides). `comptabilite` et `comptabilite_odoo` s'abonnent aux mêmes événements : **ne jamais enregistrer les deux**.
+
 ### Limites de la comptabilité native
-- **Non branchée** aux événements : la facturation classique n'émet pas d'événement « facture émise » ; seuls `payment.received` (Ventes) et `invoice.certified` (DGI) existent. Achats et Paie n'émettent rien d'exploitable.
-- Pas de TVA automatique, rapprochement bancaire, balance âgée, immobilisations (le moteur d'amortissement reste dans l'addon), budgets, TAFIRE/DSF, export PDF/CSV des états.
-- Plan, comptes 131/139, journal de clôture, règle d'arrondi, présentation du bilan (par préfixe) : **A_VALIDER** par un expert-comptable OHADA/DGI. Ne vaut pas liasse officielle.
-- Écriture multi-devises mono-taux ; taux fourni par l'appelant ou par un `ExchangeRateProviderProtocol` injecté (aucun taux inventé).
+- **Achats et Paie non branchés** : les événements Achats n'ont pas de montants comptabilisables validés ; aucun producteur `payroll.validated`.
+- **Partenaire** : les écritures de facture DGI portent NIF ou nom du client, celles de la facturation classique et des encaissements l'identifiant client. Le Core ne porte pas l'identifiant client sur l'événement DGI : une balance âgée par client exige de l'unifier (à faire avant d'écrire la balance âgée).
+- Un seul compte de produit et de TVA (pas de ventilation par groupe de taxe, ni TVA exonérée distincte) ; montant non taxable et autres taxes refusés (A_VALIDER).
+- Taux de change : requis pour toute écriture hors devise société (aucun taux inventé). Facture en CDF sans taux déclaré : refusée et réessayée au rejeu.
+- Pas de TVA à déclarer, rapprochement bancaire, balance âgée, immobilisations (moteur d'amortissement resté dans l'addon), budgets, TAFIRE/DSF, export PDF/CSV des états.
+- Plan, comptes 131/139, journal de clôture, règle d'arrondi, présentation du bilan (par préfixe), comptes de la table de correspondance : **A_VALIDER** par un expert-comptable OHADA/DGI. Ne vaut pas liasse officielle.
+- Écriture multi-devises mono-taux.
 
 ## Livré (adaptateur Odoo, voie alternative)
 - `vorpal/modules/adapters/odoo/` : client Odoo (ABC, XML-RPC, simulateur `FakeOdooClient`), poster, conversion de devises, file d'attente SQLite avec reprise (backoff), handlers d'événements, boîte de corrélation facture/cachet DGI, mapping des comptes, module `BaseModule`.

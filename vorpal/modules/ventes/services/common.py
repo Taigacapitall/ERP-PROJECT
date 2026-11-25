@@ -10,7 +10,9 @@ from decimal import Decimal
 
 from vorpal.core import AuditLog, AuthorizationService, Currency, Money, User
 from vorpal.core.contracts import InvoiceDTO
+from vorpal.modules.ventes.domain.customers import Customer
 from vorpal.modules.ventes.domain.errors import SalesComplianceError, SalesValidationError
+from vorpal.modules.ventes.domain.invoices import SalesInvoice
 from vorpal.modules.ventes.domain.payments import Payment
 from vorpal.modules.ventes.domain.totals import ensure_strict_decimal
 from vorpal.modules.ventes.ports.publisher import SalesEventPublisher
@@ -73,6 +75,9 @@ class PostCommitBatch:
     audits: list[PendingAuditRecord] = field(default_factory=list)
     ready_invoices: list[InvoiceDTO] = field(default_factory=list)
     received_payments: list[Payment] = field(default_factory=list)
+    issued_invoices: list[tuple[SalesInvoice, Customer]] = field(default_factory=list)
+    issued_credit_notes: list[tuple[SalesInvoice, Customer]] = field(default_factory=list)
+    cancelled_payments: list[Payment] = field(default_factory=list)
 
     def add_audit(
         self,
@@ -112,6 +117,12 @@ class PostCommitBatch:
             deps.publisher.invoice_ready_for_certification(inv_dto)
         for payment in self.received_payments:
             deps.publisher.payment_received(payment)
+        for issued, customer in self.issued_invoices:
+            deps.publisher.invoice_issued(issued, customer)
+        for note, customer in self.issued_credit_notes:
+            deps.publisher.credit_note_issued(note, customer)
+        for cancelled in self.cancelled_payments:
+            deps.publisher.payment_cancelled(cancelled)
 
 
 class ApplicationService:

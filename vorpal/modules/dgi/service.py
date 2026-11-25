@@ -294,6 +294,18 @@ class CertificationService(FiscalCertifier):
                     "authentication_code": response.certification.authentication_code,
                     "qr_code": response.certification.qr_code,
                     "certified_at": response.certification.certified_at,
+                    # Donnees comptables : le consommateur (comptabilite) n'a ni a relire Ventes ni a memoriser le
+                    # document. Montants en chaines. TODO(A_VALIDER) : payload definitif des evenements fiscaux.
+                    "invoice_date": invoice.issue_date.isoformat(),
+                    "currency": invoice.currency.value,
+                    "total_ht": str(invoice.total_ht.amount),
+                    "total_vat": str(invoice.total_vat.amount),
+                    "total_ttc": str(invoice.total_ttc.amount),
+                    "non_taxable_amount": str(invoice.non_taxable_amount.amount),
+                    "other_taxes_amount": str(invoice.other_taxes_amount.amount),
+                    "customer_name": invoice.customer.name,
+                    "customer_nif": invoice.customer.tax_id,
+                    "original_invoice_id": invoice.original_invoice_id,
                 },
                 correlation_id=invoice.serial_number,
             )

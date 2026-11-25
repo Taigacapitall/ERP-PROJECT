@@ -34,12 +34,12 @@ Le chiffre fait foi seulement s'il est reproduit par ces commandes. Les 2 tests 
 | Ventes — **facturation classique (sans DGI)** | Vérifié (lot 1) | Voir §5 |
 | DGI | Simulateur seulement | Pas de client réel, pas d'homologation (évolution distincte) |
 | Achats | Présent, peu de tests dédiés (9) | Pas encore exercé par scénario complet ni relié à la comptabilité |
-| Comptabilité native | Vérifié (socle, 43 tests) | Grand livre, états, clôture ; **pas encore branché** aux événements Ventes/Achats/Paie ; plan de base à valider ; voir `docs/COMPTABILITE.md` |
+| Comptabilité native | Vérifié (51 tests) | Grand livre, états, clôture ; branchée aux événements Ventes (facture classique, avoir, encaissement, annulation) et DGI (facture/avoir certifié) ; **Achats et Paie non branchés** ; plan de base à valider ; voir `docs/COMPTABILITE.md` |
 | Comptabilité (Odoo) | Partiel, non prioritaire | Adaptateur testé en simulation ; addon jamais exécuté sur un vrai Odoo |
 | API / interface / authentification | **Absent** | Bloquant pour toute utilisation réelle (lots 2+) |
 
 ## 4. Qualité mesurée
-- Tests : 762 réussis, 2 ignorés (dont 43 pour `comptabilite`). Couverture `vorpal/` : 93 % (mesurée avant le lot 1).
+- Tests : 770 réussis, 2 ignorés (dont 43 unitaires `comptabilite` et 8 d'intégration Ventes/DGI → comptabilité). Couverture `vorpal/` : 93 % (mesurée avant le lot 1).
 - Ruff `vorpal` : 6 erreurs, toutes dans `adapters/odoo` (`client.py`, `mapping.py`, `module.py`). Mypy strict : 3 erreurs (`odoo/handlers.py`, `odoo/inbox.py`). **Aucune erreur dans Ventes, Core, DGI, Achats.**
 - Ruff `tests` : 47 erreurs historiques (dette connue, hors nouveau fichier de tests).
 - Ne jamais relâcher Ruff/Mypy ni ajouter `type: ignore` pour masquer une erreur.
@@ -69,7 +69,7 @@ Services (exposés par `VentesModule`) : `classic_service` (`services/classic_in
 | E12 | Règles métier `A_VALIDER` (TVA, arrondis, numérotation, relances) | À valider par un comptable |
 | E14 | Relances automatiques | À faire |
 | E15 | Achats exploitable (paiement fournisseur, écrans) | À faire |
-| E16 | Comptabilité native (grand livre, balance, bilan, résultat, clôture) | **Socle livré** ; reste : branchement aux événements, états PDF/CSV, balance âgée, validation comptable |
+| E16 | Comptabilité native (grand livre, balance, bilan, résultat, clôture) | **Socle et branchement Ventes/DGI livrés** ; reste : Achats/Paie, états PDF/CSV, balance âgée, validation comptable |
 | E17 | Corriger Ruff/Mypy Odoo, nettoyer le dépôt | En cours (docs et scripts nettoyés le 24/11) |
 | E18 | Tableaux de bord, e-mail, import CSV, taux de change | À faire |
 | E19 | DGI réelle et facture normalisée | Plus tard, évolution distincte |

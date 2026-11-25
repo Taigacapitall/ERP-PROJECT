@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from vorpal.core.module import ModuleManifest
+from vorpal.modules.comptabilite.events import LISTENED_EVENTS
 from vorpal.modules.comptabilite.settings import PERM_ADMIN, PERM_POST, PERM_VIEW
 
 COMPTA_PERMISSIONS: tuple[str, ...] = (PERM_VIEW, PERM_POST, PERM_ADMIN)
@@ -14,6 +15,6 @@ COMPTA_MANIFEST = ModuleManifest(
     version="0.1.0",
     depends=[],
     provides=["accounting_posting", "general_ledger"],
-    subscribes=[],
+    subscribes=list(LISTENED_EVENTS),
     permissions=list(COMPTA_PERMISSIONS),
 )

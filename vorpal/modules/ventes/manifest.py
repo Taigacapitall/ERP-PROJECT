@@ -19,6 +19,9 @@ VENTES_EVENTS_LISTENED: tuple[str, ...] = (
 VENTES_EVENTS_EMITTED: tuple[str, ...] = (
     "invoice.ready_for_certification",
     "payment.received",
+    "ventes.invoice.issued",
+    "ventes.credit_note.issued",
+    "ventes.payment.cancelled",
 )
 
 # Aucune dependance declaree vers DGI : les deux modules ne communiquent que par evenements.

@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "status": "A_VALIDER",
+  "note": "Comptes et journaux par défaut des écritures automatiques. À valider par un expert-comptable OHADA RDC avant production. Un seul compte de produit (le Core ne porte pas la nature de ligne). MOBILE_MONEY est routé vers les journaux banque (décision provisoire).",
+  "sales": {
+    "journal": "VTE",
+    "receivable": "4111",
+    "revenue": "7011",
+    "vat_collected": "4431"
+  },
+  "payments": {
+    "receivable": "4111",
+    "routes": {
+      "CASH:USD": "CAU",
+      "CASH:CDF": "CAF",
+      "BANK_TRANSFER:USD": "BQU",
+      "BANK_TRANSFER:CDF": "BQF",
+      "MOBILE_MONEY:USD": "BQU",
+      "MOBILE_MONEY:CDF": "BQF"
+    }
+  }
+}
