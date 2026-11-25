@@ -1,8 +1,25 @@
-# Comptabilité OHADA / Odoo — état au 24 novembre 2026
+# Comptabilité OHADA — état au 24 novembre 2026
 
 Document unique remplaçant `HANDOFF_SECTION_COMPTA.md`, `ETAT_DES_TESTS_COMPTA.md` et `INTEGRATION_COMPTA_RAPPORT.md` (supprimés ; leur historique reste dans git). Audit détaillé : `AUDIT_COMPTA_OHADA.md`. Installation : `README_ADAPTATEUR_ODOO.md`.
 
-## Livré
+## Comptabilité native (voie retenue — E16)
+Produit unique, sans Odoo : `vorpal/modules/comptabilite/` (tables `compta_*`, migration additive `SchemaMigrationManager("comptabilite")`).
+- **Domaine** : comptes (classes OHADA), journaux (compte de trésorerie par défaut), exercices, écritures immuables (extourne au lieu de modification), conversion USD/CDF avec absorption de l'écart d'arrondi (≤ 0,05).
+- **Comptabilisation** (`PostingService`) : idempotente par `source_ref` (même référence + contenu différent = conflit), numérotation sans trou par journal et exercice (`VTE-2026-000001`), refus hors exercice ouvert ou période verrouillée, journal en devise imposée, montants stockés en centimes (sommes SQL exactes).
+- **États** (`ReportService`) : balance générale (ouverture / mouvements / clôture), grand livre avec solde cumulé, bilan et compte de résultat via les définitions OHADA JSON (reprises de l'addon, copiées sans le modifier).
+- **Clôture** (`ClosingService`) : solde 6-8 vers 131/139, clôt et verrouille ; idempotente ; refuse de clôturer dans le désordre. Les écritures de clôture sont exclues des mouvements de l'exercice (le compte de résultat reste lisible) mais comptent dans les soldes de bilan.
+- **Port Core** : `CoreLedgerPoster` implémente `AccountingPoster` (mono-devise, codes courts résolus par préfixe). À ne pas enregistrer avec `comptabilite_odoo` (même service).
+- **Permissions** : `compta.view`, `compta.post`, `compta.admin`.
+- **Plan** : `data/plan_syscohada_base.json` (154 comptes, niveaux 2 à 4 chiffres, **A_VALIDER**). Plan complet : `ChartService.import_csv(<account.account-syscohada.csv d'Odoo>)`.
+- **Tests** : `tests/comptabilite/` (43), SQLite mémoire et base fichier avec redémarrage ; scénario chiffré à la main (résultat 1 500, bilan 12 300 / 12 300).
+
+### Limites de la comptabilité native
+- **Non branchée** aux événements : la facturation classique n'émet pas d'événement « facture émise » ; seuls `payment.received` (Ventes) et `invoice.certified` (DGI) existent. Achats et Paie n'émettent rien d'exploitable.
+- Pas de TVA automatique, rapprochement bancaire, balance âgée, immobilisations (le moteur d'amortissement reste dans l'addon), budgets, TAFIRE/DSF, export PDF/CSV des états.
+- Plan, comptes 131/139, journal de clôture, règle d'arrondi, présentation du bilan (par préfixe) : **A_VALIDER** par un expert-comptable OHADA/DGI. Ne vaut pas liasse officielle.
+- Écriture multi-devises mono-taux ; taux fourni par l'appelant ou par un `ExchangeRateProviderProtocol` injecté (aucun taux inventé).
+
+## Livré (adaptateur Odoo, voie alternative)
 - `vorpal/modules/adapters/odoo/` : client Odoo (ABC, XML-RPC, simulateur `FakeOdooClient`), poster, conversion de devises, file d'attente SQLite avec reprise (backoff), handlers d'événements, boîte de corrélation facture/cachet DGI, mapping des comptes, module `BaseModule`.
 - `odoo_addons/vorpal_compta_ohada/` : champs `vorpal_source_ref` (index unique par société), cachet DGI, verrouillage, journaux/devises, moteur d'états OHADA (JSON), amortissements.
 - `scripts/install_vorpal_compta.sh` : installation sans écrasement, refuse de toucher `vorpal/core`.

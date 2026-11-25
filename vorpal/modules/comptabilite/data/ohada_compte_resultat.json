@@ -1,0 +1,337 @@
+{
+ "code": "compte_resultat",
+ "title": "Compte de résultat OHADA par nature (structure simplifiée)",
+ "status": "A_VALIDER",
+ "note": "Produits et charges présentés en positif. Soldes intermédiaires de gestion (VA, EBE) non produits : à valider avec l'expert-comptable.",
+ "lines": [
+  {
+   "code": "TA",
+   "label": "Ventes de marchandises",
+   "level": 1,
+   "accounts": [
+    "701"
+   ],
+   "sign": -1
+  },
+  {
+   "code": "RA",
+   "label": "Achats de marchandises",
+   "level": 1,
+   "accounts": [
+    "601"
+   ],
+   "sign": 1
+  },
+  {
+   "code": "RB",
+   "label": "Variation de stocks de marchandises",
+   "level": 1,
+   "accounts": [
+    "6031"
+   ],
+   "sign": 1
+  },
+  {
+   "code": "XA",
+   "label": "MARGE COMMERCIALE",
+   "level": 2,
+   "sum": [
+    "+TA",
+    "-RA",
+    "-RB"
+   ]
+  },
+  {
+   "code": "TB",
+   "label": "Ventes de produits fabriqués",
+   "level": 1,
+   "accounts": [
+    "702",
+    "703",
+    "704",
+    "705"
+   ],
+   "sign": -1
+  },
+  {
+   "code": "TC",
+   "label": "Travaux, services vendus",
+   "level": 1,
+   "accounts": [
+    "706"
+   ],
+   "sign": -1
+  },
+  {
+   "code": "TD",
+   "label": "Produits accessoires",
+   "level": 1,
+   "accounts": [
+    "707"
+   ],
+   "sign": -1
+  },
+  {
+   "code": "XB",
+   "label": "CHIFFRE D'AFFAIRES",
+   "level": 2,
+   "sum": [
+    "+TA",
+    "+TB",
+    "+TC",
+    "+TD"
+   ]
+  },
+  {
+   "code": "TE",
+   "label": "Production stockée (déstockage)",
+   "level": 1,
+   "accounts": [
+    "73"
+   ],
+   "sign": -1
+  },
+  {
+   "code": "TF",
+   "label": "Production immobilisée",
+   "level": 1,
+   "accounts": [
+    "72"
+   ],
+   "sign": -1
+  },
+  {
+   "code": "TG",
+   "label": "Subventions d'exploitation",
+   "level": 1,
+   "accounts": [
+    "71"
+   ],
+   "sign": -1
+  },
+  {
+   "code": "TH",
+   "label": "Autres produits",
+   "level": 1,
+   "accounts": [
+    "75"
+   ],
+   "sign": -1
+  },
+  {
+   "code": "TI",
+   "label": "Reprises, transferts de charges d'exploitation",
+   "level": 1,
+   "accounts": [
+    "781",
+    "791",
+    "798",
+    "799"
+   ],
+   "sign": -1
+  },
+  {
+   "code": "RC",
+   "label": "Achats de matières premières et fournitures liées",
+   "level": 1,
+   "accounts": [
+    "602"
+   ],
+   "sign": 1
+  },
+  {
+   "code": "RD",
+   "label": "Variation de stocks de matières premières",
+   "level": 1,
+   "accounts": [
+    "6032"
+   ],
+   "sign": 1
+  },
+  {
+   "code": "RE",
+   "label": "Autres achats",
+   "level": 1,
+   "accounts": [
+    "604",
+    "605",
+    "608"
+   ],
+   "sign": 1
+  },
+  {
+   "code": "RF",
+   "label": "Variation de stocks d'autres approvisionnements",
+   "level": 1,
+   "accounts": [
+    "6033"
+   ],
+   "sign": 1
+  },
+  {
+   "code": "RG",
+   "label": "Transports",
+   "level": 1,
+   "accounts": [
+    "61"
+   ],
+   "sign": 1
+  },
+  {
+   "code": "RH",
+   "label": "Services extérieurs",
+   "level": 1,
+   "accounts": [
+    "62",
+    "63"
+   ],
+   "sign": 1
+  },
+  {
+   "code": "RI",
+   "label": "Impôts et taxes",
+   "level": 1,
+   "accounts": [
+    "64"
+   ],
+   "sign": 1
+  },
+  {
+   "code": "RJ",
+   "label": "Autres charges",
+   "level": 1,
+   "accounts": [
+    "65"
+   ],
+   "sign": 1
+  },
+  {
+   "code": "RK",
+   "label": "Charges de personnel",
+   "level": 1,
+   "accounts": [
+    "66"
+   ],
+   "sign": 1
+  },
+  {
+   "code": "RL",
+   "label": "Dotations aux amortissements et provisions d'exploitation",
+   "level": 1,
+   "accounts": [
+    "681",
+    "691"
+   ],
+   "sign": 1
+  },
+  {
+   "code": "XE",
+   "label": "RÉSULTAT D'EXPLOITATION",
+   "level": 2,
+   "sum": [
+    "+XB",
+    "+TE",
+    "+TF",
+    "+TG",
+    "+TH",
+    "+TI",
+    "-RA",
+    "-RB",
+    "-RC",
+    "-RD",
+    "-RE",
+    "-RF",
+    "-RG",
+    "-RH",
+    "-RI",
+    "-RJ",
+    "-RK",
+    "-RL"
+   ]
+  },
+  {
+   "code": "TJ",
+   "label": "Revenus financiers, reprises et transferts financiers",
+   "level": 1,
+   "accounts": [
+    "77",
+    "787",
+    "797"
+   ],
+   "sign": -1
+  },
+  {
+   "code": "RM",
+   "label": "Frais financiers et dotations financières",
+   "level": 1,
+   "accounts": [
+    "67",
+    "687",
+    "697"
+   ],
+   "sign": 1
+  },
+  {
+   "code": "XF",
+   "label": "RÉSULTAT FINANCIER",
+   "level": 2,
+   "sum": [
+    "+TJ",
+    "-RM"
+   ]
+  },
+  {
+   "code": "TK",
+   "label": "Produits HAO",
+   "level": 1,
+   "accounts": [
+    "82",
+    "84",
+    "86",
+    "88"
+   ],
+   "sign": -1
+  },
+  {
+   "code": "RN",
+   "label": "Charges HAO",
+   "level": 1,
+   "accounts": [
+    "81",
+    "83",
+    "85",
+    "87"
+   ],
+   "sign": 1
+  },
+  {
+   "code": "XH",
+   "label": "RÉSULTAT HORS ACTIVITÉS ORDINAIRES",
+   "level": 2,
+   "sum": [
+    "+TK",
+    "-RN"
+   ]
+  },
+  {
+   "code": "RS",
+   "label": "Impôts sur le résultat",
+   "level": 1,
+   "accounts": [
+    "89"
+   ],
+   "sign": 1
+  },
+  {
+   "code": "XI",
+   "label": "RÉSULTAT NET",
+   "level": 2,
+   "sum": [
+    "+XE",
+    "+XF",
+    "+XH",
+    "-RS"
+   ]
+  }
+ ]
+}

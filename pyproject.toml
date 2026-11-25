@@ -55,3 +55,4 @@ strict = true
 "vorpal.modules.achats" = ["data/*.json"]
 "vorpal.modules.adapters.odoo" = ["data/*.json"]
 "vorpal.modules.ventes" = ["data/*.json"]
+"vorpal.modules.comptabilite" = ["data/*.json"]

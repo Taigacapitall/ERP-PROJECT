@@ -1,0 +1,69 @@
+{
+ "version": 1,
+ "status": "A_VALIDER",
+ "journals": [
+  {
+   "code": "VTE",
+   "name": "Ventes",
+   "kind": "SALES",
+   "currency": null,
+   "default_account": null
+  },
+  {
+   "code": "ACH",
+   "name": "Achats",
+   "kind": "PURCHASES",
+   "currency": null,
+   "default_account": null
+  },
+  {
+   "code": "OD",
+   "name": "Opérations diverses",
+   "kind": "MISC",
+   "currency": null,
+   "default_account": null
+  },
+  {
+   "code": "PAIE",
+   "name": "Paie",
+   "kind": "PAYROLL",
+   "currency": null,
+   "default_account": null
+  },
+  {
+   "code": "IMMO",
+   "name": "Immobilisations et amortissements",
+   "kind": "FIXED_ASSETS",
+   "currency": null,
+   "default_account": null
+  },
+  {
+   "code": "CAU",
+   "name": "Caisse USD",
+   "kind": "CASH",
+   "currency": "USD",
+   "default_account": "5712"
+  },
+  {
+   "code": "CAF",
+   "name": "Caisse CDF",
+   "kind": "CASH",
+   "currency": "CDF",
+   "default_account": "5711"
+  },
+  {
+   "code": "BQU",
+   "name": "Banque USD",
+   "kind": "BANK",
+   "currency": "USD",
+   "default_account": "5212"
+  },
+  {
+   "code": "BQF",
+   "name": "Banque CDF",
+   "kind": "BANK",
+   "currency": "CDF",
+   "default_account": "5211"
+  }
+ ]
+}

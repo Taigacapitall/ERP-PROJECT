@@ -1,0 +1,777 @@
+{
+ "version": 1,
+ "status": "A_VALIDER",
+ "note": "Plan de base SYSCOHADA révisé (niveaux 2 à 4 chiffres) pour démarrer. Squelette à valider par un expert-comptable OHADA ; pour le plan complet (1 134 comptes) importer le CSV de l10n_syscohada avec ChartService.import_csv.",
+ "accounts": [
+  {
+   "code": "10",
+   "name": "Capital",
+   "reconcilable": false
+  },
+  {
+   "code": "101",
+   "name": "Capital social",
+   "reconcilable": false
+  },
+  {
+   "code": "102",
+   "name": "Capital par dotation",
+   "reconcilable": false
+  },
+  {
+   "code": "104",
+   "name": "Compte de l'exploitant",
+   "reconcilable": false
+  },
+  {
+   "code": "105",
+   "name": "Primes liées au capital social",
+   "reconcilable": false
+  },
+  {
+   "code": "106",
+   "name": "Écarts de réévaluation",
+   "reconcilable": false
+  },
+  {
+   "code": "109",
+   "name": "Actionnaires, capital souscrit non appelé",
+   "reconcilable": false
+  },
+  {
+   "code": "11",
+   "name": "Réserves",
+   "reconcilable": false
+  },
+  {
+   "code": "111",
+   "name": "Réserve légale",
+   "reconcilable": false
+  },
+  {
+   "code": "112",
+   "name": "Réserves statutaires ou contractuelles",
+   "reconcilable": false
+  },
+  {
+   "code": "113",
+   "name": "Réserves réglementées",
+   "reconcilable": false
+  },
+  {
+   "code": "118",
+   "name": "Autres réserves",
+   "reconcilable": false
+  },
+  {
+   "code": "12",
+   "name": "Report à nouveau",
+   "reconcilable": false
+  },
+  {
+   "code": "121",
+   "name": "Report à nouveau créditeur",
+   "reconcilable": false
+  },
+  {
+   "code": "129",
+   "name": "Report à nouveau débiteur",
+   "reconcilable": false
+  },
+  {
+   "code": "13",
+   "name": "Résultat net de l'exercice",
+   "reconcilable": false
+  },
+  {
+   "code": "130",
+   "name": "Résultat en instance d'affectation",
+   "reconcilable": false
+  },
+  {
+   "code": "131",
+   "name": "Résultat net de l'exercice : bénéfice",
+   "reconcilable": false
+  },
+  {
+   "code": "139",
+   "name": "Résultat net de l'exercice : perte",
+   "reconcilable": false
+  },
+  {
+   "code": "14",
+   "name": "Subventions d'investissement",
+   "reconcilable": false
+  },
+  {
+   "code": "15",
+   "name": "Provisions réglementées et fonds assimilés",
+   "reconcilable": false
+  },
+  {
+   "code": "16",
+   "name": "Emprunts et dettes assimilées",
+   "reconcilable": false
+  },
+  {
+   "code": "161",
+   "name": "Emprunts obligataires",
+   "reconcilable": false
+  },
+  {
+   "code": "162",
+   "name": "Emprunts et dettes auprès des établissements de crédit",
+   "reconcilable": false
+  },
+  {
+   "code": "165",
+   "name": "Dépôts et cautionnements reçus",
+   "reconcilable": false
+  },
+  {
+   "code": "168",
+   "name": "Autres emprunts et dettes",
+   "reconcilable": false
+  },
+  {
+   "code": "17",
+   "name": "Dettes de crédit-bail et contrats assimilés",
+   "reconcilable": false
+  },
+  {
+   "code": "18",
+   "name": "Dettes liées à des participations",
+   "reconcilable": false
+  },
+  {
+   "code": "19",
+   "name": "Provisions financières pour risques et charges",
+   "reconcilable": false
+  },
+  {
+   "code": "21",
+   "name": "Immobilisations incorporelles",
+   "reconcilable": false
+  },
+  {
+   "code": "211",
+   "name": "Frais de développement",
+   "reconcilable": false
+  },
+  {
+   "code": "212",
+   "name": "Brevets, licences, concessions et droits similaires",
+   "reconcilable": false
+  },
+  {
+   "code": "213",
+   "name": "Logiciels et sites internet",
+   "reconcilable": false
+  },
+  {
+   "code": "22",
+   "name": "Terrains",
+   "reconcilable": false
+  },
+  {
+   "code": "23",
+   "name": "Bâtiments, installations techniques et agencements",
+   "reconcilable": false
+  },
+  {
+   "code": "24",
+   "name": "Matériel, mobilier et actifs biologiques",
+   "reconcilable": false
+  },
+  {
+   "code": "241",
+   "name": "Matériel et outillage industriel et commercial",
+   "reconcilable": false
+  },
+  {
+   "code": "244",
+   "name": "Matériel et mobilier de bureau",
+   "reconcilable": false
+  },
+  {
+   "code": "245",
+   "name": "Matériel de transport",
+   "reconcilable": false
+  },
+  {
+   "code": "25",
+   "name": "Avances et acomptes versés sur immobilisations",
+   "reconcilable": false
+  },
+  {
+   "code": "26",
+   "name": "Titres de participation",
+   "reconcilable": false
+  },
+  {
+   "code": "27",
+   "name": "Autres immobilisations financières",
+   "reconcilable": false
+  },
+  {
+   "code": "281",
+   "name": "Amortissements des immobilisations incorporelles",
+   "reconcilable": false
+  },
+  {
+   "code": "283",
+   "name": "Amortissements des bâtiments et installations",
+   "reconcilable": false
+  },
+  {
+   "code": "284",
+   "name": "Amortissements du matériel",
+   "reconcilable": false
+  },
+  {
+   "code": "29",
+   "name": "Dépréciations des immobilisations",
+   "reconcilable": false
+  },
+  {
+   "code": "31",
+   "name": "Marchandises",
+   "reconcilable": false
+  },
+  {
+   "code": "32",
+   "name": "Matières premières et fournitures liées",
+   "reconcilable": false
+  },
+  {
+   "code": "33",
+   "name": "Autres approvisionnements",
+   "reconcilable": false
+  },
+  {
+   "code": "34",
+   "name": "Produits en cours",
+   "reconcilable": false
+  },
+  {
+   "code": "35",
+   "name": "Services en cours",
+   "reconcilable": false
+  },
+  {
+   "code": "36",
+   "name": "Produits finis",
+   "reconcilable": false
+  },
+  {
+   "code": "37",
+   "name": "Produits intermédiaires et résiduels",
+   "reconcilable": false
+  },
+  {
+   "code": "38",
+   "name": "Stocks en cours de route, en consignation ou en dépôt",
+   "reconcilable": false
+  },
+  {
+   "code": "39",
+   "name": "Dépréciations des stocks",
+   "reconcilable": false
+  },
+  {
+   "code": "401",
+   "name": "Fournisseurs, dettes en compte",
+   "reconcilable": true
+  },
+  {
+   "code": "402",
+   "name": "Fournisseurs, effets à payer",
+   "reconcilable": false
+  },
+  {
+   "code": "408",
+   "name": "Fournisseurs, factures non parvenues",
+   "reconcilable": false
+  },
+  {
+   "code": "409",
+   "name": "Fournisseurs débiteurs",
+   "reconcilable": false
+  },
+  {
+   "code": "411",
+   "name": "Clients",
+   "reconcilable": true
+  },
+  {
+   "code": "4111",
+   "name": "Clients, ventes de biens ou de prestations de services",
+   "reconcilable": true
+  },
+  {
+   "code": "412",
+   "name": "Clients, effets à recevoir",
+   "reconcilable": false
+  },
+  {
+   "code": "416",
+   "name": "Clients douteux ou litigieux",
+   "reconcilable": false
+  },
+  {
+   "code": "418",
+   "name": "Clients, produits à recevoir",
+   "reconcilable": false
+  },
+  {
+   "code": "419",
+   "name": "Clients créditeurs (avances et acomptes reçus)",
+   "reconcilable": false
+  },
+  {
+   "code": "421",
+   "name": "Personnel, avances et acomptes",
+   "reconcilable": true
+  },
+  {
+   "code": "422",
+   "name": "Personnel, rémunérations dues",
+   "reconcilable": true
+  },
+  {
+   "code": "423",
+   "name": "Personnel, oppositions et saisies-arrêts",
+   "reconcilable": false
+  },
+  {
+   "code": "425",
+   "name": "Personnel, représentants du personnel",
+   "reconcilable": false
+  },
+  {
+   "code": "431",
+   "name": "Sécurité sociale",
+   "reconcilable": false
+  },
+  {
+   "code": "4313",
+   "name": "Caisse de retraite obligatoire",
+   "reconcilable": true
+  },
+  {
+   "code": "441",
+   "name": "État, impôt sur les bénéfices",
+   "reconcilable": false
+  },
+  {
+   "code": "442",
+   "name": "État, autres impôts et taxes",
+   "reconcilable": false
+  },
+  {
+   "code": "443",
+   "name": "État, TVA facturée",
+   "reconcilable": false
+  },
+  {
+   "code": "4431",
+   "name": "État, TVA facturée sur ventes",
+   "reconcilable": false
+  },
+  {
+   "code": "4441",
+   "name": "État, TVA due",
+   "reconcilable": true
+  },
+  {
+   "code": "4449",
+   "name": "État, crédit de TVA à reporter",
+   "reconcilable": false
+  },
+  {
+   "code": "445",
+   "name": "État, TVA récupérable",
+   "reconcilable": false
+  },
+  {
+   "code": "4452",
+   "name": "État, TVA récupérable sur achats",
+   "reconcilable": false
+  },
+  {
+   "code": "447",
+   "name": "État, impôts retenus à la source",
+   "reconcilable": false
+  },
+  {
+   "code": "4472",
+   "name": "État, impôts sur salaires",
+   "reconcilable": true
+  },
+  {
+   "code": "449",
+   "name": "État, créances et dettes diverses",
+   "reconcilable": true
+  },
+  {
+   "code": "46",
+   "name": "Associés et groupe",
+   "reconcilable": false
+  },
+  {
+   "code": "471",
+   "name": "Débiteurs et créditeurs divers",
+   "reconcilable": true
+  },
+  {
+   "code": "478",
+   "name": "Écarts de conversion actif",
+   "reconcilable": false
+  },
+  {
+   "code": "481",
+   "name": "Fournisseurs d'investissements",
+   "reconcilable": false
+  },
+  {
+   "code": "485",
+   "name": "Créances sur cessions d'immobilisations",
+   "reconcilable": false
+  },
+  {
+   "code": "486",
+   "name": "Autres créances hors activités ordinaires",
+   "reconcilable": false
+  },
+  {
+   "code": "49",
+   "name": "Dépréciations et risques provisionnés (tiers)",
+   "reconcilable": false
+  },
+  {
+   "code": "50",
+   "name": "Titres de placement",
+   "reconcilable": false
+  },
+  {
+   "code": "51",
+   "name": "Valeurs à encaisser",
+   "reconcilable": false
+  },
+  {
+   "code": "521",
+   "name": "Banques locales",
+   "reconcilable": false
+  },
+  {
+   "code": "5211",
+   "name": "Banques locales en monnaie nationale",
+   "reconcilable": false
+  },
+  {
+   "code": "5212",
+   "name": "Banques locales en devises",
+   "reconcilable": false
+  },
+  {
+   "code": "56",
+   "name": "Banques, crédits de trésorerie et d'escompte",
+   "reconcilable": false
+  },
+  {
+   "code": "571",
+   "name": "Caisse",
+   "reconcilable": false
+  },
+  {
+   "code": "5711",
+   "name": "Caisse en monnaie nationale",
+   "reconcilable": false
+  },
+  {
+   "code": "5712",
+   "name": "Caisse en devises",
+   "reconcilable": false
+  },
+  {
+   "code": "585",
+   "name": "Virements de fonds",
+   "reconcilable": false
+  },
+  {
+   "code": "59",
+   "name": "Dépréciations et risques provisionnés (trésorerie)",
+   "reconcilable": false
+  },
+  {
+   "code": "601",
+   "name": "Achats de marchandises",
+   "reconcilable": false
+  },
+  {
+   "code": "602",
+   "name": "Achats de matières premières et fournitures liées",
+   "reconcilable": false
+  },
+  {
+   "code": "6031",
+   "name": "Variations de stocks de marchandises",
+   "reconcilable": false
+  },
+  {
+   "code": "6032",
+   "name": "Variations de stocks de matières premières",
+   "reconcilable": false
+  },
+  {
+   "code": "6033",
+   "name": "Variations de stocks d'autres approvisionnements",
+   "reconcilable": false
+  },
+  {
+   "code": "604",
+   "name": "Achats stockés de matières et fournitures consommables",
+   "reconcilable": false
+  },
+  {
+   "code": "605",
+   "name": "Autres achats",
+   "reconcilable": false
+  },
+  {
+   "code": "608",
+   "name": "Achats d'emballages",
+   "reconcilable": false
+  },
+  {
+   "code": "61",
+   "name": "Transports",
+   "reconcilable": false
+  },
+  {
+   "code": "62",
+   "name": "Services extérieurs A",
+   "reconcilable": false
+  },
+  {
+   "code": "622",
+   "name": "Locations et charges locatives",
+   "reconcilable": false
+  },
+  {
+   "code": "624",
+   "name": "Entretien, réparations et maintenance",
+   "reconcilable": false
+  },
+  {
+   "code": "625",
+   "name": "Primes d'assurance",
+   "reconcilable": false
+  },
+  {
+   "code": "627",
+   "name": "Publicité, publications, relations publiques",
+   "reconcilable": false
+  },
+  {
+   "code": "628",
+   "name": "Frais de télécommunications",
+   "reconcilable": false
+  },
+  {
+   "code": "63",
+   "name": "Services extérieurs B",
+   "reconcilable": false
+  },
+  {
+   "code": "631",
+   "name": "Frais bancaires",
+   "reconcilable": false
+  },
+  {
+   "code": "633",
+   "name": "Frais de formation du personnel",
+   "reconcilable": false
+  },
+  {
+   "code": "64",
+   "name": "Impôts et taxes",
+   "reconcilable": false
+  },
+  {
+   "code": "65",
+   "name": "Autres charges",
+   "reconcilable": false
+  },
+  {
+   "code": "66",
+   "name": "Charges de personnel",
+   "reconcilable": false
+  },
+  {
+   "code": "661",
+   "name": "Rémunérations directes versées au personnel national",
+   "reconcilable": false
+  },
+  {
+   "code": "6611",
+   "name": "Appointements, salaires et commissions",
+   "reconcilable": false
+  },
+  {
+   "code": "664",
+   "name": "Charges sociales",
+   "reconcilable": false
+  },
+  {
+   "code": "6641",
+   "name": "Charges sociales sur rémunérations du personnel national",
+   "reconcilable": false
+  },
+  {
+   "code": "67",
+   "name": "Frais financiers et charges assimilées",
+   "reconcilable": false
+  },
+  {
+   "code": "671",
+   "name": "Intérêts des emprunts",
+   "reconcilable": false
+  },
+  {
+   "code": "676",
+   "name": "Pertes de change financières",
+   "reconcilable": false
+  },
+  {
+   "code": "681",
+   "name": "Dotations aux amortissements d'exploitation",
+   "reconcilable": false
+  },
+  {
+   "code": "687",
+   "name": "Dotations aux amortissements financiers",
+   "reconcilable": false
+  },
+  {
+   "code": "691",
+   "name": "Dotations aux provisions d'exploitation",
+   "reconcilable": false
+  },
+  {
+   "code": "701",
+   "name": "Ventes de marchandises",
+   "reconcilable": false
+  },
+  {
+   "code": "7011",
+   "name": "Ventes de marchandises dans la région",
+   "reconcilable": false
+  },
+  {
+   "code": "702",
+   "name": "Ventes de produits finis",
+   "reconcilable": false
+  },
+  {
+   "code": "704",
+   "name": "Travaux",
+   "reconcilable": false
+  },
+  {
+   "code": "705",
+   "name": "Études",
+   "reconcilable": false
+  },
+  {
+   "code": "706",
+   "name": "Services vendus",
+   "reconcilable": false
+  },
+  {
+   "code": "707",
+   "name": "Produits accessoires",
+   "reconcilable": false
+  },
+  {
+   "code": "71",
+   "name": "Subventions d'exploitation",
+   "reconcilable": false
+  },
+  {
+   "code": "72",
+   "name": "Production immobilisée",
+   "reconcilable": false
+  },
+  {
+   "code": "73",
+   "name": "Variations de stocks de biens et services produits",
+   "reconcilable": false
+  },
+  {
+   "code": "75",
+   "name": "Autres produits",
+   "reconcilable": false
+  },
+  {
+   "code": "77",
+   "name": "Revenus financiers et produits assimilés",
+   "reconcilable": false
+  },
+  {
+   "code": "776",
+   "name": "Gains de change financiers",
+   "reconcilable": false
+  },
+  {
+   "code": "781",
+   "name": "Transferts de charges d'exploitation",
+   "reconcilable": false
+  },
+  {
+   "code": "791",
+   "name": "Reprises de provisions d'exploitation",
+   "reconcilable": false
+  },
+  {
+   "code": "81",
+   "name": "Valeurs comptables des cessions d'immobilisations",
+   "reconcilable": false
+  },
+  {
+   "code": "82",
+   "name": "Produits des cessions d'immobilisations",
+   "reconcilable": false
+  },
+  {
+   "code": "83",
+   "name": "Charges hors activités ordinaires",
+   "reconcilable": false
+  },
+  {
+   "code": "84",
+   "name": "Produits hors activités ordinaires",
+   "reconcilable": false
+  },
+  {
+   "code": "85",
+   "name": "Dotations hors activités ordinaires",
+   "reconcilable": false
+  },
+  {
+   "code": "86",
+   "name": "Reprises hors activités ordinaires",
+   "reconcilable": false
+  },
+  {
+   "code": "88",
+   "name": "Subventions d'équilibre",
+   "reconcilable": false
+  },
+  {
+   "code": "891",
+   "name": "Impôts sur les bénéfices",
+   "reconcilable": false
+  }
+ ]
+}
