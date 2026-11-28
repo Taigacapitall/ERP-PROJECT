@@ -1,7 +1,7 @@
 # HANDOFF — Vorpal Business Management
 
 > **Document unique de reprise.** C'est le seul fichier à tenir à jour. L'historique des anciennes sessions est archivé dans
-> `docs/archive/HANDOFF_HISTORIQUE_2026-11-24.md` (ne plus le modifier). Dernière mise à jour : **27 novembre 2026** (briques A1 et A2).
+> `docs/archive/HANDOFF_HISTORIQUE_2026-11-24.md` (ne plus le modifier). Dernière mise à jour : **27 novembre 2026** (briques A1 à A3).
 
 ## 1. Vérifier l'état en 1 minute
 ```bash
@@ -10,14 +10,14 @@ pip install -e ".[dev]"
 python -m pytest -q                     # attendu : 829 passed (mesuré par Josh après A1, 28/11/2026)
 python -m ruff check .                  # attendu : All checks passed
 python -m mypy vorpal                   # attendu : Success, 0 erreur (175 fichiers)
-git diff core-v1 -- vorpal/core         # attendu : vide (Core gelé)
+git diff core-v1 -- vorpal/core         # attendu après A3 : uniquement des lignes ajoutées (pagination.py, contracts/__init__.py) ; `--numstat` : 0 suppression
 ```
 Le chiffre fait foi seulement s'il est reproduit par ces commandes. Référence avant A1 (sortie fournie par Josh, 27/11/2026) : **886 passed, 2 skipped** ; ruff `.` 62 erreurs ; mypy 3 erreurs (toutes dans l'adaptateur Odoo). Les anciens chiffres 719 et 770 de ce fichier étaient périmés.
 
 ## 2. Carte du dépôt
 | Chemin | Rôle |
 |---|---|
-| `vorpal/core/` | Core v1 **gelé** (tag `core-v1`) : événements, contrats DTO, permissions, audit, DB |
+| `vorpal/core/` | Core v1 **gelé** (tag `core-v1`) + **ajouts v1.1** (A3) : `contracts/pagination.py` (`PageRequest`, `Page[T]`, `SortSpec`, exportés par `contracts/`). Ajouts seulement ; tag `core-v1.1` à poser par Josh |
 | `vorpal/modules/ventes/` | Clients, catalogue, devis, commandes, factures, paiements, avoirs, PDF, persistance SQL |
 | `vorpal/modules/dgi/` | Circuit de certification fiscale (client **simulé** uniquement) |
 | `vorpal/modules/achats/` | Fournisseurs, commandes d'achat, réceptions, factures fournisseurs |
