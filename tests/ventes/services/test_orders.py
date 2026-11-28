@@ -2,16 +2,24 @@ import logging
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from types import SimpleNamespace
+
 import pytest
+
 from vorpal.core import AuditLog, AuthorizationService, Currency, Money, Partner, User
-from vorpal.modules.ventes.domain.customers import Customer
-from vorpal.modules.ventes.domain.orders import SalesOrder, OrderStatus
-from vorpal.modules.ventes.domain.quotes import Quote, QuoteLine, QuoteStatus
 from vorpal.modules.ventes.domain.catalog import SalesItem
-from vorpal.modules.ventes.domain.errors import SalesComplianceError, SalesConflictError, SalesNotFoundError, SalesValidationError
+from vorpal.modules.ventes.domain.customers import Customer
+from vorpal.modules.ventes.domain.errors import (
+    SalesComplianceError,
+    SalesConflictError,
+    SalesNotFoundError,
+    SalesValidationError,
+)
+from vorpal.modules.ventes.domain.orders import OrderStatus, SalesOrder
+from vorpal.modules.ventes.domain.quotes import Quote, QuoteLine, QuoteStatus
 from vorpal.modules.ventes.services.common import LineInput
 from vorpal.modules.ventes.services.orders import OrderService
 from vorpal.modules.ventes.settings import RoundingSettings
+
 
 class Repo:
     def __init__(self): self.data = {}
@@ -72,7 +80,8 @@ def make_order(e, status=OrderStatus.DRAFT):
         unit_price_ht=Money(Decimal("100"),Currency.USD), tax_group="VAT16"),), status=status)
 
 def test_create_order_builds_draft_and_audits():
-    e = make_env(); add_customer(e)
+    e = make_env()
+    add_customer(e)
     order = e.service.create_order(e.actor, customer_id="C1", lines=[manual_line()], order_id="O1")
     assert order.status == OrderStatus.DRAFT
     assert order.number == "ORDER-2026-00001"
@@ -83,12 +92,14 @@ def test_create_order_builds_draft_and_audits():
 def test_create_order_rejects_missing_or_inactive_customer():
     with pytest.raises(SalesNotFoundError):
         make_env().service.create_order(make_env().actor, customer_id="X", lines=[manual_line()])
-    e = make_env(); add_customer(e, False)
+    e = make_env()
+    add_customer(e, False)
     with pytest.raises(SalesConflictError):
         e.service.create_order(e.actor, customer_id="C1", lines=[manual_line()])
 
 def test_create_order_rejects_empty_lines():
-    e = make_env(); add_customer(e)
+    e = make_env()
+    add_customer(e)
     with pytest.raises(SalesValidationError):
         e.service.create_order(e.actor, customer_id="C1", lines=[])
 
@@ -128,7 +139,8 @@ def test_create_order_accepts_valid_manual_line():
     assert len(order.lines) == 1
 
 def test_create_order_resolves_catalog_item_and_price():
-    e = make_env(); add_customer(e)
+    e = make_env()
+    add_customer(e)
     e.catalog.items["IT1"] = SalesItem(code="IT1", designation="Article")
     order = e.service.create_order(e.actor, customer_id="C1",
         lines=[LineInput(item_code=" IT1 ", quantity=Decimal("2"))])
@@ -136,7 +148,8 @@ def test_create_order_resolves_catalog_item_and_price():
     assert order.lines[0].unit_price_ht.amount == Decimal("100")
 
 def test_create_order_rejects_unknown_or_inactive_item():
-    e = make_env(); add_customer(e)
+    e = make_env()
+    add_customer(e)
     with pytest.raises(SalesNotFoundError):
         e.service.create_order(e.actor, customer_id="C1", lines=[LineInput(item_code="X")])
     e.catalog.items["X"] = SalesItem(code="X", designation="X", is_active=False)
@@ -144,7 +157,8 @@ def test_create_order_rejects_unknown_or_inactive_item():
         e.service.create_order(e.actor, customer_id="C1", lines=[LineInput(item_code="X")])
 
 def test_update_order_lines_only_while_draft():
-    e = make_env(); e.orders.save(make_order(e))
+    e = make_env()
+    e.orders.save(make_order(e))
     updated = e.service.update_order_lines(e.actor, "O1", [manual_line()])
     assert updated.lines[0].designation == "Prestation"
     e.orders.save(make_order(e, OrderStatus.CONFIRMED))
@@ -157,7 +171,8 @@ def test_update_order_lines_rejects_missing_order():
         e.service.update_order_lines(e.actor, "X", [manual_line()])
 
 def test_set_deposit_by_percentage_and_amount():
-    e = make_env(); e.orders.save(make_order(e))
+    e = make_env()
+    e.orders.save(make_order(e))
     by_percent = e.service.set_deposit(e.actor, "O1", percent=Decimal("50"))
     assert by_percent.deposit_required.amount > 0
     by_amount = e.service.set_deposit(e.actor, "O1", amount=Money(Decimal("25.555"),Currency.USD))
@@ -168,7 +183,8 @@ def test_set_deposit_by_percentage_and_amount():
                                      {"amount":Money(Decimal("-1"),Currency.USD)},
                                      {"amount":Money(Decimal("1"),Currency.CDF)}])
 def test_set_deposit_rejects_invalid_parameters(kwargs):
-    e = make_env(); e.orders.save(make_order(e))
+    e = make_env()
+    e.orders.save(make_order(e))
     with pytest.raises(SalesValidationError):
         e.service.set_deposit(e.actor, "O1", **kwargs)
 
@@ -178,7 +194,8 @@ def test_set_deposit_rejects_unknown_order():
         e.service.set_deposit(e.actor, "X", percent=Decimal("10"))
 
 def test_confirm_and_cancel_order():
-    e = make_env(); e.orders.save(make_order(e))
+    e = make_env()
+    e.orders.save(make_order(e))
     confirmed = e.service.confirm_order(e.actor, "O1")
     assert confirmed.status == OrderStatus.CONFIRMED
     cancelled = e.service.cancel_order(e.actor, "O1")
@@ -186,12 +203,16 @@ def test_confirm_and_cancel_order():
 
 def test_confirm_cancel_and_get_handle_missing_order():
     e = make_env()
-    with pytest.raises(SalesNotFoundError): e.service.confirm_order(e.actor, "X")
-    with pytest.raises(SalesNotFoundError): e.service.cancel_order(e.actor, "X")
-    with pytest.raises(SalesNotFoundError): e.service.get_order(e.actor, "X")
+    with pytest.raises(SalesNotFoundError):
+        e.service.confirm_order(e.actor, "X")
+    with pytest.raises(SalesNotFoundError):
+        e.service.cancel_order(e.actor, "X")
+    with pytest.raises(SalesNotFoundError):
+        e.service.get_order(e.actor, "X")
 
 def test_get_and_list_orders():
-    e = make_env(); e.orders.save(make_order(e))
+    e = make_env()
+    e.orders.save(make_order(e))
     assert e.service.get_order(e.actor, "O1").id == "O1"
     assert [x.id for x in e.service.list_orders(e.actor)] == ["O1"]
 
@@ -209,16 +230,19 @@ def test_convert_accepted_quote_to_order():
 
 def test_convert_quote_rejects_missing_or_unaccepted_quote():
     e = make_env()
-    with pytest.raises(SalesNotFoundError): e.service.create_from_quote(e.actor, "X")
+    with pytest.raises(SalesNotFoundError):
+        e.service.create_from_quote(e.actor, "X")
     q = Quote(id="Q1", number="DEV-1", customer_id="C1", quote_date=date(2026,11,1),
         valid_until=date(2026,12,1), currency=Currency.USD,
         lines=(QuoteLine(item_code=None, designation="Service", quantity=Decimal("1"),
             unit_price_ht=Money(Decimal("100"),Currency.USD)),))
     e.quotes.save(q)
-    with pytest.raises(SalesConflictError): e.service.create_from_quote(e.actor, "Q1")
+    with pytest.raises(SalesConflictError):
+        e.service.create_from_quote(e.actor, "Q1")
 
 def test_create_order_requires_permission():
-    e = make_env(frozenset({"ventes.view"})); add_customer(e)
+    e = make_env(frozenset({"ventes.view"}))
+    add_customer(e)
     with pytest.raises(SalesComplianceError):
         e.service.create_order(e.actor, customer_id="C1", lines=[manual_line()])
 

@@ -2,12 +2,12 @@
 
 import pytest
 from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import sessionmaker
 
-from vorpal.modules.ventes.adapters.persistence.models import Base
 from vorpal.modules.ventes.adapters.persistence.memory_repositories import (
     InMemorySalesStore,
 )
+from vorpal.modules.ventes.adapters.persistence.models import Base
 from vorpal.modules.ventes.adapters.persistence.unit_of_work import (
     InMemorySalesUnitOfWork,
     SqlSalesUnitOfWork,

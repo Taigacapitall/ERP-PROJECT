@@ -2,15 +2,23 @@ import logging
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from types import SimpleNamespace
+
 import pytest
+
 from vorpal.core import AuditLog, AuthorizationService, Currency, Money, Partner, User
-from vorpal.modules.ventes.domain.customers import Customer
-from vorpal.modules.ventes.domain.quotes import Quote, QuoteLine, QuoteStatus
 from vorpal.modules.ventes.domain.catalog import SalesItem
-from vorpal.modules.ventes.domain.errors import SalesComplianceError, SalesConflictError, SalesNotFoundError, SalesValidationError
+from vorpal.modules.ventes.domain.customers import Customer
+from vorpal.modules.ventes.domain.errors import (
+    SalesComplianceError,
+    SalesConflictError,
+    SalesNotFoundError,
+    SalesValidationError,
+)
+from vorpal.modules.ventes.domain.quotes import Quote, QuoteLine, QuoteStatus
 from vorpal.modules.ventes.services.common import LineInput
 from vorpal.modules.ventes.services.quotes import QuoteService
 from vorpal.modules.ventes.settings import RoundingSettings
+
 
 class Repo:
     def __init__(self): self.data = {}
@@ -68,7 +76,8 @@ def make_quote(status=QuoteStatus.DRAFT, valid_until=date(2026,12,1), qid="Q1"):
                          unit_price_ht=Money(Decimal("100"),Currency.USD)),),status=status)
 
 def test_create_quote_builds_document_and_audit():
-    e=make_env(); add_customer(e)
+    e=make_env()
+    add_customer(e)
     q=e.service.create_quote(e.actor,customer_id="C1",valid_until=date(2026,12,1),
         lines=[line()],quote_id="Q2")
     assert q.id=="Q2"
@@ -78,7 +87,8 @@ def test_create_quote_builds_document_and_audit():
     assert e.audit.entries[-1].action=="CREATE_QUOTE"
 
 def test_create_quote_uses_catalog_item():
-    e=make_env(); add_customer(e)
+    e=make_env()
+    add_customer(e)
     e.catalog.items["IT1"]=SalesItem(code="IT1",designation="Article")
     q=e.service.create_quote(e.actor,customer_id="C1",valid_until=date(2026,12,1),
         lines=[LineInput(item_code="IT1")])
@@ -89,12 +99,14 @@ def test_create_quote_rejects_missing_or_inactive_customer():
     e=make_env()
     with pytest.raises(SalesNotFoundError):
         e.service.create_quote(e.actor,customer_id="X",valid_until=date(2026,12,1),lines=[line()])
-    e=make_env(); add_customer(e,False)
+    e=make_env()
+    add_customer(e,False)
     with pytest.raises(SalesConflictError):
         e.service.create_quote(e.actor,customer_id="C1",valid_until=date(2026,12,1),lines=[line()])
 
 def test_create_quote_rejects_empty_lines_and_invalid_manual_line():
-    e=make_env(); add_customer(e)
+    e=make_env()
+    add_customer(e)
     with pytest.raises(SalesValidationError):
         e.service.create_quote(e.actor,customer_id="C1",valid_until=date(2026,12,1),lines=[])
     invalid=[
@@ -108,7 +120,8 @@ def test_create_quote_rejects_empty_lines_and_invalid_manual_line():
             e.service.create_quote(e.actor,customer_id="C1",valid_until=date(2026,12,1),lines=[item])
 
 def test_create_quote_rejects_unknown_and_inactive_catalog_item():
-    e=make_env(); add_customer(e)
+    e=make_env()
+    add_customer(e)
     with pytest.raises(SalesNotFoundError):
         e.service.create_quote(e.actor,customer_id="C1",valid_until=date(2026,12,1),lines=[LineInput(item_code="X")])
     e.catalog.items["X"]=SalesItem(code="X",designation="X",is_active=False)
@@ -116,7 +129,8 @@ def test_create_quote_rejects_unknown_and_inactive_catalog_item():
         e.service.create_quote(e.actor,customer_id="C1",valid_until=date(2026,12,1),lines=[LineInput(item_code="X")])
 
 def test_send_accept_and_reject_quote():
-    e=make_env(); e.quotes.save(make_quote())
+    e=make_env()
+    e.quotes.save(make_quote())
     sent=e.service.send_quote(e.actor,"Q1")
     assert sent.status==QuoteStatus.SENT
     accepted=e.service.accept_quote(e.actor,"Q1")
@@ -128,12 +142,14 @@ def test_send_accept_and_reject_quote():
 def test_send_accept_reject_raise_for_missing_quote():
     e=make_env()
     for method in (e.service.send_quote,e.service.accept_quote,e.service.reject_quote):
-        with pytest.raises(SalesNotFoundError): method(e.actor,"X")
+        with pytest.raises(SalesNotFoundError):
+            method(e.actor,"X")
 
 def test_send_rejects_expired_quote():
     e=make_env()
     e.quotes.save(make_quote(valid_until=date(2026,11,1)))
-    with pytest.raises(SalesConflictError): e.service.send_quote(e.actor,"Q1")
+    with pytest.raises(SalesConflictError):
+        e.service.send_quote(e.actor,"Q1")
 
 def test_expire_due_quotes_only_expired_draft_and_sent():
     e=make_env()
@@ -163,10 +179,12 @@ def test_get_and_list_quotes_are_sorted():
 
 def test_get_quote_rejects_unknown_id():
     e=make_env()
-    with pytest.raises(SalesNotFoundError): e.service.get_quote(e.actor,"X")
+    with pytest.raises(SalesNotFoundError):
+        e.service.get_quote(e.actor,"X")
 
 def test_quote_creation_requires_permission():
-    e=make_env(frozenset({"ventes.view"})); add_customer(e)
+    e=make_env(frozenset({"ventes.view"}))
+    add_customer(e)
     with pytest.raises(SalesComplianceError):
         e.service.create_quote(e.actor,customer_id="C1",valid_until=date(2026,12,1),lines=[line()])
 
