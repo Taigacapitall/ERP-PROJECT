@@ -1,7 +1,7 @@
 # HANDOFF — Vorpal Business Management
 
 > **Document unique de reprise.** C'est le seul fichier à tenir à jour. L'historique des anciennes sessions est archivé dans
-> `docs/archive/HANDOFF_HISTORIQUE_2026-11-24.md` (ne plus le modifier). Dernière mise à jour : **27 novembre 2026** (briques A1 à A3).
+> `docs/archive/HANDOFF_HISTORIQUE_2026-11-24.md` (ne plus le modifier). Dernière mise à jour : **27 novembre 2026** (briques A1 à A4, jalon P0).
 
 ## 1. Vérifier l'état en 1 minute
 ```bash
@@ -26,6 +26,10 @@ Le chiffre fait foi seulement s'il est reproduit par ces commandes. Référence 
 | `tests/` | core, dgi, ventes, achats, stock, comptabilite, integration |
 | `docs/` | Documentation de référence (voir §8) |
 | `.github/workflows/ci.yml` | **CI (A2)** : Python 3.11 et 3.12, service PostgreSQL 16 ; ruff `.`, mypy strict, contrôle Core (aucune ligne supprimée par rapport à `core-v1`), pytest. Bloquant : aucune étape n'ignore une erreur |
+| `vorpal/plateforme/` | **Squelette (A4)** : couche hôte, `catalog.py` (chargement dynamique ; module absent ou archivé ignoré). N'importe que le Core |
+| `docs/adr/` | **ADR-001 à 013** (voir `docs/adr/README.md`) ; 001 à 010 dérivés de R1 à R8 et §5.1/5.5, à valider par Josh |
+| `scripts/check_additive_changes.py` | Refuse toute ligne supprimée par rapport à `core-v1` (utilisé par la CI) |
+| `tests/plateforme/` | Tests d'architecture : aucun module/Core n'importe la Plateforme, modules indépendants entre eux, Plateforme sans import de module, `offline-core` sans DOM ni service worker (vacuité tant que le paquet n'existe pas), démarrage sans module absent/archivé |
 | `docker-compose.yml` | PostgreSQL 16 de développement (`docker compose up -d db`) |
 
 ## 3. État par module (preuves : tests exécutés le 24/11/2026)
@@ -49,7 +53,7 @@ Le chiffre fait foi seulement s'il est reproduit par ces commandes. Référence 
 
 ## 4 bis. CI (A2)
 - La CI expose `VORPAL_TEST_DATABASE_URL` (PostgreSQL 16) ; **aucun test actuel ne l'utilise** et aucun pilote PostgreSQL (psycopg) n'est déclaré : il sera ajouté, version épinglée, avec les premiers tests PostgreSQL (brique B1).
-- Le contrôle Core de la CI sera remplacé par `scripts/check_additive_changes.py` (A4). Pré-requis : le tag `core-v1` doit exister sur GitHub (`git push origin core-v1` si absent).
+- Le contrôle Core de la CI utilise `scripts/check_additive_changes.py` (A4). Pré-requis : le tag `core-v1` doit exister sur GitHub (`git push origin core-v1` si absent).
 - À faire par Josh : activer la protection de branche `main` (exiger le contrôle « Contrôles (Python 3.11) » et « (3.12) » avant fusion) ; vérifier qu'une erreur volontaire fait échouer la CI (voir livraison A2).
 
 ## 5. Facturation commerciale classique (lot 1, sans DGI)

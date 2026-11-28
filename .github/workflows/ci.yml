@@ -55,14 +55,10 @@ jobs:
 
       - name: Core protégé (ajouts seulement par rapport à core-v1)
         # Échoue si le tag core-v1 est absent ou si une ligne existante du Core est supprimée.
-        # Sera remplacé par scripts/check_additive_changes.py (brique A4).
-        run: |
-          git rev-parse --verify --quiet refs/tags/core-v1 >/dev/null \
-            || { echo "Tag core-v1 introuvable"; exit 1; }
-          git diff --numstat core-v1 -- vorpal/core | tee /tmp/core_numstat.txt
-          if awk '$2 > 0 { bad = 1 } END { exit !bad }' /tmp/core_numstat.txt; then
-            echo "Le Core contient des lignes supprimées ou modifiées par rapport à core-v1"; exit 1
-          fi
+        run: python scripts/check_additive_changes.py --base core-v1 vorpal/core
+
+      - name: Tests d'architecture
+        run: python -m pytest -q tests/plateforme
 
       - name: Tests
         run: python -m pytest -q
