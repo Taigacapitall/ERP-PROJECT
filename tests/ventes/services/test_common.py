@@ -21,14 +21,13 @@ from vorpal.modules.ventes.domain.errors import (
     SalesValidationError,
 )
 from vorpal.modules.ventes.domain.payments import Payment
-from vorpal.modules.ventes.settings import RoundingSettings
 from vorpal.modules.ventes.services.common import (
     ApplicationService,
     LineInput,
-    PendingAuditRecord,
     PostCommitBatch,
     ServiceDependencies,
 )
+from vorpal.modules.ventes.settings import RoundingSettings
 
 
 class FakePublisher:
@@ -57,7 +56,7 @@ def make_dependencies(
     publisher = FakePublisher()
     audit = AuditLog()
     authz = AuthorizationService()
-    user = User(
+    User(
         id="USER-01",
         username="test-user",
         direct_permissions=permissions,

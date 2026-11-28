@@ -36,6 +36,8 @@ addopts = "-ra"
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+# Code archive (decision A1) : hors paquet principal et hors CI.
+extend-exclude = ["legacy"]
 
 [tool.ruff.lint]
 # Jeu de regles explicite : le jeu par defaut de ruff change d'une version a l'autre.
@@ -53,6 +55,5 @@ strict = true
 [tool.setuptools.package-data]
 "vorpal.modules.dgi" = ["data/*.json"]
 "vorpal.modules.achats" = ["data/*.json"]
-"vorpal.modules.adapters.odoo" = ["data/*.json"]
 "vorpal.modules.ventes" = ["data/*.json"]
 "vorpal.modules.comptabilite" = ["data/*.json"]

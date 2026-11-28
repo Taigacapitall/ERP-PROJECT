@@ -1,30 +1,36 @@
 # HANDOFF — Vorpal Business Management
 
 > **Document unique de reprise.** C'est le seul fichier à tenir à jour. L'historique des anciennes sessions est archivé dans
-> `docs/archive/HANDOFF_HISTORIQUE_2026-11-24.md` (ne plus le modifier). Dernière mise à jour : **24 novembre 2026**.
+> `docs/archive/HANDOFF_HISTORIQUE_2026-11-24.md` (ne plus le modifier). Dernière mise à jour : **27 novembre 2026** (briques A1 à A4, jalon P0).
 
 ## 1. Vérifier l'état en 1 minute
 ```bash
 source .venv/bin/activate
 pip install -e ".[dev]"
-python -m pytest -q                     # attendu : 719 passed, 2 skipped
-python -m ruff check vorpal             # attendu : 6 erreurs (adaptateur Odoo, voir §4)
-python -m mypy vorpal                   # attendu : 3 erreurs (adaptateur Odoo, voir §4)
-git diff core-v1 -- vorpal/core         # attendu : vide (Core gelé)
+python -m pytest -q                     # attendu : 829 passed (mesuré par Josh après A1, 28/11/2026)
+python -m ruff check .                  # attendu : All checks passed
+python -m mypy vorpal                   # attendu : Success, 0 erreur (175 fichiers)
+git diff core-v1 -- vorpal/core         # attendu après A3 : uniquement des lignes ajoutées (pagination.py, contracts/__init__.py) ; `--numstat` : 0 suppression
 ```
-Le chiffre fait foi seulement s'il est reproduit par ces commandes. Les 2 tests ignorés attendent le fichier du plan comptable SYSCOHADA (`VORPAL_SYSCOHADA_CSV`).
+Le chiffre fait foi seulement s'il est reproduit par ces commandes. Référence avant A1 (sortie fournie par Josh, 27/11/2026) : **886 passed, 2 skipped** ; ruff `.` 62 erreurs ; mypy 3 erreurs (toutes dans l'adaptateur Odoo). Les anciens chiffres 719 et 770 de ce fichier étaient périmés.
 
 ## 2. Carte du dépôt
 | Chemin | Rôle |
 |---|---|
-| `vorpal/core/` | Core v1 **gelé** (tag `core-v1`) : événements, contrats DTO, permissions, audit, DB |
+| `vorpal/core/` | Core v1 **gelé** (tag `core-v1`) + **ajouts v1.1** (A3) : `contracts/pagination.py` (`PageRequest`, `Page[T]`, `SortSpec`, exportés par `contracts/`). Ajouts seulement ; tag `core-v1.1` à poser par Josh |
 | `vorpal/modules/ventes/` | Clients, catalogue, devis, commandes, factures, paiements, avoirs, PDF, persistance SQL |
 | `vorpal/modules/dgi/` | Circuit de certification fiscale (client **simulé** uniquement) |
 | `vorpal/modules/achats/` | Fournisseurs, commandes d'achat, réceptions, factures fournisseurs |
 | `vorpal/modules/comptabilite/` | **Comptabilité native** (décision E16) : plan OHADA, journaux, écritures, exercices, grand livre, balance, bilan, compte de résultat, clôture |
-| `vorpal/modules/adapters/odoo/`, `odoo_addons/` | Comptabilité via Odoo (alternative abandonnée comme voie principale ; adaptateur testé avec simulateur, Odoo réel jamais exercé) |
-| `tests/` | core, dgi, ventes, achats, adapters/odoo, odoo_addons, integration |
+| `legacy/` | **Archive A1** : adaptateur Odoo (`vorpal/modules/adapters/odoo`), `odoo_addons` et leurs tests, déplacés sans modification. Hors paquet, hors CI, hors Ruff. Voir `legacy/README.md` |
+| `tests/` | core, dgi, ventes, achats, stock, comptabilite, integration |
 | `docs/` | Documentation de référence (voir §8) |
+| `.github/workflows/ci.yml` | **CI (A2)** : Python 3.11 et 3.12, service PostgreSQL 16 ; ruff `.`, mypy strict, contrôle Core (aucune ligne supprimée par rapport à `core-v1`), pytest. Bloquant : aucune étape n'ignore une erreur |
+| `vorpal/plateforme/` | **Squelette (A4)** : couche hôte, `catalog.py` (chargement dynamique ; module absent ou archivé ignoré). N'importe que le Core |
+| `docs/adr/` | **ADR-001 à 013** (voir `docs/adr/README.md`) ; 001 à 010 dérivés de R1 à R8 et §5.1/5.5, à valider par Josh |
+| `scripts/check_additive_changes.py` | Refuse toute ligne supprimée par rapport à `core-v1` (utilisé par la CI) |
+| `tests/plateforme/` | Tests d'architecture : aucun module/Core n'importe la Plateforme, modules indépendants entre eux, Plateforme sans import de module, `offline-core` sans DOM ni service worker (vacuité tant que le paquet n'existe pas), démarrage sans module absent/archivé |
+| `docker-compose.yml` | PostgreSQL 16 de développement (`docker compose up -d db`) |
 
 ## 3. État par module (preuves : tests exécutés le 24/11/2026)
 | Module | Statut | Remarque |
@@ -35,14 +41,20 @@ Le chiffre fait foi seulement s'il est reproduit par ces commandes. Les 2 tests 
 | DGI | Simulateur seulement | Pas de client réel, pas d'homologation (évolution distincte) |
 | Achats | Présent, peu de tests dédiés (9) | Pas encore exercé par scénario complet ni relié à la comptabilité |
 | Comptabilité native | Vérifié (51 tests) | Grand livre, états, clôture ; branchée aux événements Ventes (facture classique, avoir, encaissement, annulation) et DGI (facture/avoir certifié) ; **Achats et Paie non branchés** ; plan de base à valider ; voir `docs/COMPTABILITE.md` |
-| Comptabilité (Odoo) | Partiel, non prioritaire | Adaptateur testé en simulation ; addon jamais exécuté sur un vrai Odoo |
+| Comptabilité (Odoo) | **Archivé** (`legacy/`, A1) | Voie abandonnée ; code conservé tel quel, non testé en CI |
 | API / interface / authentification | **Absent** | Bloquant pour toute utilisation réelle (lots 2+) |
 
 ## 4. Qualité mesurée
-- Tests : 770 réussis, 2 ignorés (dont 43 unitaires `comptabilite` et 8 d'intégration Ventes/DGI → comptabilité). Couverture `vorpal/` : 93 % (mesurée avant le lot 1).
-- Ruff `vorpal` : 6 erreurs, toutes dans `adapters/odoo` (`client.py`, `mapping.py`, `module.py`). Mypy strict : 3 erreurs (`odoo/handlers.py`, `odoo/inbox.py`). **Aucune erreur dans Ventes, Core, DGI, Achats.**
-- Ruff `tests` : 47 erreurs historiques (dette connue, hors nouveau fichier de tests).
+- Tests : avant A1, 886 réussis, 2 ignorés. Après A1 (mesuré par Josh le 28/11/2026) : **829 réussis, 0 ignoré**, ruff `.` sans erreur, mypy sans erreur (175 fichiers), `git diff core-v1 -- vorpal/core` vide. La différence (57 réussis + 2 ignorés) correspond aux tests Odoo archivés. Couverture `vorpal/` : 93 % (mesurée avant le lot 1).
+- Avant A1 : `ruff check .` 62 erreurs (6 `adapters/odoo`, 9 `odoo_addons`, 47 `tests`) ; mypy 3 erreurs (`odoo/handlers.py`, `odoo/inbox.py`).
+- Après A1 : Odoo archivé dans `legacy/` (exclu de Ruff via `extend-exclude`, hors paquet donc hors Mypy) ; 34 erreurs Ruff de `tests/ventes` corrigées (style seul). Résultat confirmé : Ruff 0 erreur, Mypy 0 erreur.
+- Les 17 fichiers `*.backup*` / `*.bak` restent en place, ignorés par `.gitignore`, **non supprimés** (décision Josh en attente).
 - Ne jamais relâcher Ruff/Mypy ni ajouter `type: ignore` pour masquer une erreur.
+
+## 4 bis. CI (A2)
+- La CI expose `VORPAL_TEST_DATABASE_URL` (PostgreSQL 16) ; **aucun test actuel ne l'utilise** et aucun pilote PostgreSQL (psycopg) n'est déclaré : il sera ajouté, version épinglée, avec les premiers tests PostgreSQL (brique B1).
+- Le contrôle Core de la CI utilise `scripts/check_additive_changes.py` (A4). Pré-requis : le tag `core-v1` doit exister sur GitHub (`git push origin core-v1` si absent).
+- À faire par Josh : activer la protection de branche `main` (exiger le contrôle « Contrôles (Python 3.11) » et « (3.12) » avant fusion) ; vérifier qu'une erreur volontaire fait échouer la CI (voir livraison A2).
 
 ## 5. Facturation commerciale classique (lot 1, sans DGI)
 Services (exposés par `VentesModule`) : `classic_service` (`services/classic_invoicing.py`), `query_service` (`services/invoice_queries.py`), `documents.py` (PDF, CSV), plus `customer_service`, `pricing_service`, `quote_service`, `order_service`, `invoice_service` (mode DGI).
@@ -70,7 +82,7 @@ Services (exposés par `VentesModule`) : `classic_service` (`services/classic_in
 | E14 | Relances automatiques | À faire |
 | E15 | Achats exploitable (paiement fournisseur, écrans) | À faire |
 | E16 | Comptabilité native (grand livre, balance, bilan, résultat, clôture) | **Socle et branchement Ventes/DGI livrés** ; reste : Achats/Paie, états PDF/CSV, balance âgée, validation comptable |
-| E17 | Corriger Ruff/Mypy Odoo, nettoyer le dépôt | En cours (docs et scripts nettoyés le 24/11) |
+| E17 | Corriger Ruff/Mypy Odoo, nettoyer le dépôt | A1 : Odoo archivé, Ruff nettoyé ; 17 sauvegardes à traiter |
 | E18 | Tableaux de bord, e-mail, import CSV, taux de change | À faire |
 | E19 | DGI réelle et facture normalisée | Plus tard, évolution distincte |
 
@@ -90,7 +102,7 @@ Services (exposés par `VentesModule`) : `classic_service` (`services/classic_in
 | `docs/CORE_DOCUMENTATION.md` | Architecture et règles du Core |
 | `docs/VENTES_DOCUMENTATION.md` | Module Ventes (§16 : facturation classique) |
 | `docs/COMPTABILITE.md` | État de la comptabilité Odoo/OHADA |
-| `docs/AUDIT_COMPTA_OHADA.md`, `docs/README_ADAPTATEUR_ODOO.md` | Audit OHADA ; installation de l'adaptateur Odoo |
+| `docs/AUDIT_COMPTA_OHADA.md`, `docs/README_ADAPTATEUR_ODOO.md` | Audit OHADA ; installation de l'adaptateur Odoo (archivé) |
 | `docs/archive/` | Historique (lecture seule) |
 
 ## 9. Points ouverts

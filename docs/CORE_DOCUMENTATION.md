@@ -607,7 +607,7 @@ fermeture des moteurs de test, copie défensive de l'audit, enrichissement des D
 - `PyYAML` retiré des dépendances : parseur YAML minimal conservé (stack de la spec 00).
 - DTO facture : `item_code`, `non_taxable_amount`, `other_taxes` ajoutés comme champs optionnels (besoin du module DGI).
 - Ruff : jeu de règles explicite, car le jeu par défaut varie selon la version installée.
-- Adaptateur Odoo : `vorpal/modules/adapters/odoo` (spec 00).
+- Adaptateur Odoo : `legacy/vorpal/modules/adapters/odoo` (archivé, décision A1 ; spec 00).
 
 ---
 

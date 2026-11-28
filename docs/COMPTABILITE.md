@@ -33,8 +33,8 @@ Ces trois derniers événements Ventes sont nouveaux (publisher : méthodes conc
 - Écriture multi-devises mono-taux.
 
 ## Livré (adaptateur Odoo, voie alternative)
-- `vorpal/modules/adapters/odoo/` : client Odoo (ABC, XML-RPC, simulateur `FakeOdooClient`), poster, conversion de devises, file d'attente SQLite avec reprise (backoff), handlers d'événements, boîte de corrélation facture/cachet DGI, mapping des comptes, module `BaseModule`.
-- `odoo_addons/vorpal_compta_ohada/` : champs `vorpal_source_ref` (index unique par société), cachet DGI, verrouillage, journaux/devises, moteur d'états OHADA (JSON), amortissements.
+- `legacy/vorpal/modules/adapters/odoo/` (archivé, décision A1) : client Odoo (ABC, XML-RPC, simulateur `FakeOdooClient`), poster, conversion de devises, file d'attente SQLite avec reprise (backoff), handlers d'événements, boîte de corrélation facture/cachet DGI, mapping des comptes, module `BaseModule`.
+- `legacy/odoo_addons/vorpal_compta_ohada/` (archivé, décision A1) : champs `vorpal_source_ref` (index unique par société), cachet DGI, verrouillage, journaux/devises, moteur d'états OHADA (JSON), amortissements.
 - `scripts/install_vorpal_compta.sh` : installation sans écrasement, refuse de toucher `vorpal/core`.
 
 ## Tests (exécutés le 24/11/2026 avec la suite complète : 719 réussis, 2 ignorés)

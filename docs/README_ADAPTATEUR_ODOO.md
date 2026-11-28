@@ -1,5 +1,7 @@
 # Installation et lancement
 
+> **Archivé (A1, cahier v1.1 §8.1).** Le code décrit ici est dans `legacy/` (hors paquet, hors CI). Pour le réutiliser : replacer `legacy/vorpal/modules/adapters/odoo` dans `vorpal/modules/adapters/odoo`, `legacy/odoo_addons` à la racine, `legacy/tests/*` dans `tests/`. Voir `legacy/README.md`.
+
 ```bash
 # 1. Copier sans écraser (essai à blanc d'abord)
 bash scripts/install_vorpal_compta.sh /chemin/depot_vorpal --dry-run

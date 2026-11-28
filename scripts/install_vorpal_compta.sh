@@ -14,5 +14,5 @@ while IFS= read -r -d '' f; do
   if [ -e "$DEST/$rel" ]; then echo "EXISTE, conservé : $rel"; continue; fi
   echo "COPIE : $rel"
   if [ "$DRY" != "--dry-run" ]; then mkdir -p "$(dirname "$DEST/$rel")"; cp "$f" "$DEST/$rel"; fi
-done < <(find vorpal odoo_addons tests docs -type f -print0)
+done < <(find vorpal legacy tests docs -type f -print0)
 echo "Terminé. Aucun commit/push effectué. Voir docs/COMPTABILITE.md pour l'état de la comptabilité."

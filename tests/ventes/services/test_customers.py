@@ -1,12 +1,20 @@
-import pytest
 import logging
 from datetime import UTC, datetime
 from types import SimpleNamespace
+
+import pytest
+
 from vorpal.core import AuditLog, AuthorizationService, Currency, Partner, User
-from vorpal.modules.ventes.domain.customers import Customer, ContactPerson
-from vorpal.modules.ventes.domain.errors import SalesComplianceError, SalesConflictError, SalesNotFoundError, SalesValidationError
+from vorpal.modules.ventes.domain.customers import ContactPerson, Customer
+from vorpal.modules.ventes.domain.errors import (
+    SalesComplianceError,
+    SalesConflictError,
+    SalesNotFoundError,
+    SalesValidationError,
+)
 from vorpal.modules.ventes.services.customers import CustomerService
 from vorpal.modules.ventes.settings import RoundingSettings
+
 
 class Repo:
     def __init__(self): self.data = {}
