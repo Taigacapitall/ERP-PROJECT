@@ -31,8 +31,8 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
-      # Réservé aux tests PostgreSQL (brique B1) : aucun test actuel ne lit cette variable.
-      VORPAL_TEST_DATABASE_URL: postgresql://vorpal:vorpal_ci@localhost:5432/vorpal_test
+      # Active les tests PostgreSQL (brique B1) ; sans cette variable ils sont ignorés.
+      VORPAL_TEST_DATABASE_URL: postgresql://vorpal:vorpal_ci@127.0.0.1:5432/vorpal_test
     steps:
       - uses: actions/checkout@v4
         with:

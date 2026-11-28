@@ -1,7 +1,7 @@
 # HANDOFF — Vorpal Business Management
 
 > **Document unique de reprise.** C'est le seul fichier à tenir à jour. L'historique des anciennes sessions est archivé dans
-> `docs/archive/HANDOFF_HISTORIQUE_2026-11-24.md` (ne plus le modifier). Dernière mise à jour : **27 novembre 2026** (briques A1 à A4, jalon P0).
+> `docs/archive/HANDOFF_HISTORIQUE_2026-11-24.md` (ne plus le modifier). Dernière mise à jour : **27 novembre 2026** (briques A1 à A4 ; B1 et B2).
 
 ## 1. Vérifier l'état en 1 minute
 ```bash
@@ -27,6 +27,8 @@ Le chiffre fait foi seulement s'il est reproduit par ces commandes. Référence 
 | `docs/` | Documentation de référence (voir §8) |
 | `.github/workflows/ci.yml` | **CI (A2)** : Python 3.11 et 3.12, service PostgreSQL 16 ; ruff `.`, mypy strict, contrôle Core (aucune ligne supprimée par rapport à `core-v1`), pytest. Bloquant : aucune étape n'ignore une erreur |
 | `vorpal/plateforme/` | **Squelette (A4)** : couche hôte, `catalog.py` (chargement dynamique ; module absent ou archivé ignoré). N'importe que le Core |
+| `vorpal/plateforme/control/` | **B1** : `models.py` (14 tables de la base de contrôle, noms de contraintes explicites, `site_id` réservé), `migrate.py` (montée/descente Alembic), `migrations/versions/0001_plan_de_controle.py`. **Écrit mais non exécuté par Claude** (SQLAlchemy/Alembic absents de son environnement) : à valider par `pytest tests/plateforme/test_control_models.py` |
+| `vorpal/plateforme/security/secrets.py` | **B2** : chiffrement par enveloppe AES-256-GCM (`SecretBox`, `KeyRing`), rotation sans perte, contexte authentifié, `Secret` et `RedactingFilter` (secrets absents des journaux). Clés maîtres : `VORPAL_MASTER_KEY` (`id:base64`), `VORPAL_MASTER_KEY_PREVIOUS`, ou `VORPAL_MASTER_KEY_FILE` (0600). Testé par Claude : 12 tests, mypy strict propre |
 | `docs/adr/` | **ADR-001 à 013** (voir `docs/adr/README.md`) ; 001 à 010 dérivés de R1 à R8 et §5.1/5.5, à valider par Josh |
 | `scripts/check_additive_changes.py` | Refuse toute ligne supprimée par rapport à `core-v1` (utilisé par la CI) |
 | `tests/plateforme/` | Tests d'architecture : aucun module/Core n'importe la Plateforme, modules indépendants entre eux, Plateforme sans import de module, `offline-core` sans DOM ni service worker (vacuité tant que le paquet n'existe pas), démarrage sans module absent/archivé |
@@ -52,7 +54,7 @@ Le chiffre fait foi seulement s'il est reproduit par ces commandes. Référence 
 - Ne jamais relâcher Ruff/Mypy ni ajouter `type: ignore` pour masquer une erreur.
 
 ## 4 bis. CI (A2)
-- La CI expose `VORPAL_TEST_DATABASE_URL` (PostgreSQL 16) ; **aucun test actuel ne l'utilise** et aucun pilote PostgreSQL (psycopg) n'est déclaré : il sera ajouté, version épinglée, avec les premiers tests PostgreSQL (brique B1).
+- La CI expose `VORPAL_TEST_DATABASE_URL` (PostgreSQL 16), lue par `tests/plateforme/test_control_models.py` (B1) ; en local sans cette variable, les cas PostgreSQL sont ignorés (skipped). Dépendances ajoutées en B1, extra `plateforme` (inclus dans `dev`) : `alembic>=1.13,<2` (migrations de la base de contrôle, imposé par le cahier B1) et `psycopg[binary]>=3.2,<4` (pilote PostgreSQL pour les tests et la base de contrôle) ; B2 : `cryptography>=43,<51` (AES-GCM ; version 50.0.1 utilisée par Claude pour ses essais). Bornes de version, non vérifiées sur PyPI depuis l'environnement de Claude.
 - Le contrôle Core de la CI utilise `scripts/check_additive_changes.py` (A4). Pré-requis : le tag `core-v1` doit exister sur GitHub (`git push origin core-v1` si absent).
 - À faire par Josh : activer la protection de branche `main` (exiger le contrôle « Contrôles (Python 3.11) » et « (3.12) » avant fusion) ; vérifier qu'une erreur volontaire fait échouer la CI (voir livraison A2).
 
@@ -110,3 +112,16 @@ Services (exposés par `VentesModule`) : `classic_service` (`services/classic_in
 - Avoirs avec remboursement client : le solde net négatif est affiché mais aucun remboursement n'est géré.
 - Le journal d'audit (`AuditLog` du Core) est en mémoire : à rendre persistant (E10) sans toucher au Core.
 - DGI réelle : client HTTP, mapping des groupes de taxe, homologation (hors périmètre MVP).
+
+## Tests PostgreSQL en local
+1. `docker compose up -d db`, puis une seule fois :
+   `docker compose exec db psql -U vorpal -d vorpal_dev -c "CREATE DATABASE vorpal_test;"`
+2. `export VORPAL_TEST_DATABASE_URL="postgresql://vorpal:vorpal_dev@127.0.0.1:5432/vorpal_test"`
+   (utiliser 127.0.0.1 et non localhost : le compose publie le port en IPv4 seulement)
+3. `ruff check . && mypy vorpal && pytest -q -rs` → attendu : 0 skipped.
+
+Chaque test PostgreSQL crée puis supprime son propre schéma temporaire `t_<hex>`.
+`test_migration_matches_models` compare migration et modèles (défauts serveur, types sur PostgreSQL).
+Versions testées (28/11/2026, Python 3.14) : alembic 1.20.1, cryptography 50.0.2,
+psycopg[binary] 3.3.9, SQLAlchemy 2.1.9.
+Base de référence : 893 tests réussis, 0 ignoré (B1 validée sur SQLite et PostgreSQL 16).
