@@ -1,15 +1,15 @@
 # HANDOFF — Vorpal Business Management
 
 > **Document unique de reprise.** C'est le seul fichier à tenir à jour. L'historique des anciennes sessions est archivé dans
-> `docs/archive/HANDOFF_HISTORIQUE_2026-11-24.md` (ne plus le modifier). Dernière mise à jour : **27 novembre 2026** (brique A1).
+> `docs/archive/HANDOFF_HISTORIQUE_2026-11-24.md` (ne plus le modifier). Dernière mise à jour : **27 novembre 2026** (briques A1 et A2).
 
 ## 1. Vérifier l'état en 1 minute
 ```bash
 source .venv/bin/activate
 pip install -e ".[dev]"
-python -m pytest -q                     # attendu après A1 : voir §4 (à consigner par Josh)
+python -m pytest -q                     # attendu : 829 passed (mesuré par Josh après A1, 28/11/2026)
 python -m ruff check .                  # attendu : All checks passed
-python -m mypy vorpal                   # attendu : Success, 0 erreur
+python -m mypy vorpal                   # attendu : Success, 0 erreur (175 fichiers)
 git diff core-v1 -- vorpal/core         # attendu : vide (Core gelé)
 ```
 Le chiffre fait foi seulement s'il est reproduit par ces commandes. Référence avant A1 (sortie fournie par Josh, 27/11/2026) : **886 passed, 2 skipped** ; ruff `.` 62 erreurs ; mypy 3 erreurs (toutes dans l'adaptateur Odoo). Les anciens chiffres 719 et 770 de ce fichier étaient périmés.
@@ -25,6 +25,8 @@ Le chiffre fait foi seulement s'il est reproduit par ces commandes. Référence 
 | `legacy/` | **Archive A1** : adaptateur Odoo (`vorpal/modules/adapters/odoo`), `odoo_addons` et leurs tests, déplacés sans modification. Hors paquet, hors CI, hors Ruff. Voir `legacy/README.md` |
 | `tests/` | core, dgi, ventes, achats, stock, comptabilite, integration |
 | `docs/` | Documentation de référence (voir §8) |
+| `.github/workflows/ci.yml` | **CI (A2)** : Python 3.11 et 3.12, service PostgreSQL 16 ; ruff `.`, mypy strict, contrôle Core (aucune ligne supprimée par rapport à `core-v1`), pytest. Bloquant : aucune étape n'ignore une erreur |
+| `docker-compose.yml` | PostgreSQL 16 de développement (`docker compose up -d db`) |
 
 ## 3. État par module (preuves : tests exécutés le 24/11/2026)
 | Module | Statut | Remarque |
@@ -39,11 +41,16 @@ Le chiffre fait foi seulement s'il est reproduit par ces commandes. Référence 
 | API / interface / authentification | **Absent** | Bloquant pour toute utilisation réelle (lots 2+) |
 
 ## 4. Qualité mesurée
-- Tests : avant A1, 886 réussis, 2 ignorés (sortie Josh 27/11/2026). A1 retire du périmètre les tests Odoo archivés (57 réussis + 2 ignorés d'après exécution partielle) : attendu après A1 **≈ 829 réussis, 0 ignoré**, à confirmer par `pytest -q` sur l'arbre de Josh. Couverture `vorpal/` : 93 % (mesurée avant le lot 1).
+- Tests : avant A1, 886 réussis, 2 ignorés. Après A1 (mesuré par Josh le 28/11/2026) : **829 réussis, 0 ignoré**, ruff `.` sans erreur, mypy sans erreur (175 fichiers), `git diff core-v1 -- vorpal/core` vide. La différence (57 réussis + 2 ignorés) correspond aux tests Odoo archivés. Couverture `vorpal/` : 93 % (mesurée avant le lot 1).
 - Avant A1 : `ruff check .` 62 erreurs (6 `adapters/odoo`, 9 `odoo_addons`, 47 `tests`) ; mypy 3 erreurs (`odoo/handlers.py`, `odoo/inbox.py`).
-- Après A1 : Odoo archivé dans `legacy/` (exclu de Ruff via `extend-exclude`, hors paquet donc hors Mypy) ; 34 erreurs Ruff de `tests/ventes` corrigées (style seul). Attendu : Ruff 0 erreur, Mypy 0 erreur sur `vorpal` (mypy complet à confirmer par Josh ; vérifié ici hors erreurs de dépendances absentes : plus aucune des 3 erreurs Odoo).
+- Après A1 : Odoo archivé dans `legacy/` (exclu de Ruff via `extend-exclude`, hors paquet donc hors Mypy) ; 34 erreurs Ruff de `tests/ventes` corrigées (style seul). Résultat confirmé : Ruff 0 erreur, Mypy 0 erreur.
 - Les 17 fichiers `*.backup*` / `*.bak` restent en place, ignorés par `.gitignore`, **non supprimés** (décision Josh en attente).
 - Ne jamais relâcher Ruff/Mypy ni ajouter `type: ignore` pour masquer une erreur.
+
+## 4 bis. CI (A2)
+- La CI expose `VORPAL_TEST_DATABASE_URL` (PostgreSQL 16) ; **aucun test actuel ne l'utilise** et aucun pilote PostgreSQL (psycopg) n'est déclaré : il sera ajouté, version épinglée, avec les premiers tests PostgreSQL (brique B1).
+- Le contrôle Core de la CI sera remplacé par `scripts/check_additive_changes.py` (A4). Pré-requis : le tag `core-v1` doit exister sur GitHub (`git push origin core-v1` si absent).
+- À faire par Josh : activer la protection de branche `main` (exiger le contrôle « Contrôles (Python 3.11) » et « (3.12) » avant fusion) ; vérifier qu'une erreur volontaire fait échouer la CI (voir livraison A2).
 
 ## 5. Facturation commerciale classique (lot 1, sans DGI)
 Services (exposés par `VentesModule`) : `classic_service` (`services/classic_invoicing.py`), `query_service` (`services/invoice_queries.py`), `documents.py` (PDF, CSV), plus `customer_service`, `pricing_service`, `quote_service`, `order_service`, `invoice_service` (mode DGI).
